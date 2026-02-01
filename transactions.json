@@ -1,0 +1,26 @@
+[
+  {
+    "txn_id": "",
+    "description": "",
+    "clean_description": "",
+    "merchant_name": "",
+    "merchant_type": "",
+    "payment_channel": "",
+    "amount": "",
+    "type": "",
+    "date": "",
+    "weekday": "",
+    "time_of_day": "",
+    "18": "23",
+    "balance_after_txn": "",
+    "category": "",
+    "subcategory": "",
+    "transaction_mode": "",
+    "is_recurring": "",
+    "recurrence_interval": "",
+    "confidence_score": "",
+    "is_high_value": "",
+    "is_suspicious": "",
+    "embedding_version": ""
+  }
+]
