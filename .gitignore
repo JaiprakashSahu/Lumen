@@ -1,0 +1,41 @@
+# Environment variables
+.env
+*.env
+
+# Google credentials
+client_secret.json
+credentials.json
+token.pickle
+token.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Virtual environments
+.venv
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Uploads directory (receipts may contain sensitive info)
+project/uploads/receipts/*
+!project/uploads/receipts/.gitkeep
