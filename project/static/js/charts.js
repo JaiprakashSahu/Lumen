@@ -2,6 +2,9 @@
 // Chart.js Dark Theme Configuration
 // Expects window.__CHART_DATA__ to be present (injected by template) OR will fetch from /api/dashboard-data
 
+// Store chart instances for proper cleanup
+window.chartInstances = window.chartInstances || {};
+
 // Configure Chart.js defaults for dark backgrounds
 if (typeof Chart !== 'undefined') {
   Chart.defaults.color = 'rgba(255, 255, 255, 0.6)'; // Axis labels
@@ -40,8 +43,15 @@ async function fetchChartData() {
 
 function createDonut(canvas, labels, values) {
   if (!canvas) return;
+  
+  // Destroy existing chart instance using Chart.js built-in method
+  const existingChart = Chart.getChart(canvas);
+  if (existingChart) {
+    existingChart.destroy();
+  }
+  
   const ctx = canvas.getContext('2d');
-  new Chart(ctx, {
+  const chartInstance = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels: labels,
@@ -62,12 +72,22 @@ function createDonut(canvas, labels, values) {
       }
     }
   });
+  
+  // Store the chart instance for future cleanup
+  window.chartInstances[canvas.id] = chartInstance;
 }
 
 function createLine(canvas, labels, values) {
   if (!canvas) return;
+  
+  // Destroy existing chart instance using Chart.js built-in method
+  const existingChart = Chart.getChart(canvas);
+  if (existingChart) {
+    existingChart.destroy();
+  }
+  
   const ctx = canvas.getContext('2d');
-  new Chart(ctx, {
+  const chartInstance = new Chart(ctx, {
     type: 'line',
     data: {
       labels: labels,
@@ -88,33 +108,58 @@ function createLine(canvas, labels, values) {
       plugins: { legend: { display: false } }
     }
   });
+  
+  // Store the chart instance for future cleanup
+  window.chartInstances[canvas.id] = chartInstance;
+}
+
+// Function to destroy all chart instances
+function destroyAllCharts() {
+  Object.keys(window.chartInstances).forEach(chartId => {
+    if (window.chartInstances[chartId]) {
+      window.chartInstances[chartId].destroy();
+      delete window.chartInstances[chartId];
+    }
+  });
 }
 
 async function initCharts() {
   try {
+    // Check if we're on the analytics page that has its own chart handling
+    if (document.querySelector('.analytics-dashboard')) {
+      console.log("Analytics page detected - skipping charts.js initialization");
+      return;
+    }
+    
+    // Destroy any existing charts first
+    destroyAllCharts();
+    
     const d = await fetchChartData();
 
     // Exit early if no data available
-    if (!d) return;
+    if (!d) {
+      console.log("No chart data available");
+      return;
+    }
 
     // If server serialized JSON as string already, ensure object
     const data = (typeof d === "string") ? JSON.parse(d) : d;
 
-    // Donut chart
+    // Only create charts if the canvas elements exist and don't have existing Chart instances
     const donutCanvas = document.getElementById('donutChart');
-    if (donutCanvas) {
+    if (donutCanvas && !Chart.getChart(donutCanvas) && data.donut_labels && data.donut_values) {
       createDonut(donutCanvas, data.donut_labels, data.donut_values);
     }
 
     // Mini donut
     const mini = document.getElementById('miniDonut');
-    if (mini) {
+    if (mini && !Chart.getChart(mini) && data.mini_labels && data.mini_values) {
       createDonut(mini, data.mini_labels, data.mini_values);
     }
 
     // Line chart
     const line = document.getElementById('lineChart');
-    if (line) {
+    if (line && !Chart.getChart(line) && data.line_labels && data.line_values) {
       createLine(line, data.line_labels, data.line_values);
     }
 
@@ -123,4 +168,9 @@ async function initCharts() {
   }
 }
 
+// Initialize charts when DOM is ready
 document.addEventListener("DOMContentLoaded", initCharts);
+
+// Also expose initCharts globally for manual refresh
+window.initCharts = initCharts;
+window.destroyAllCharts = destroyAllCharts;

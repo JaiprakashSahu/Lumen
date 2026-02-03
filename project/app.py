@@ -160,16 +160,38 @@ def auth_google():
 # ---------------------- GOOGLE CALLBACK ----------------------
 @app.route("/oauth2callback")
 def oauth2callback():
-    state = session["state"]
+    try:
+        state = session["state"]
 
-    flow = Flow.from_client_secrets_file(
-        CLIENT_SECRET_FILE,
-        scopes=SCOPES,
-        state=state,
-        redirect_uri=url_for("oauth2callback", _external=True)
-    )
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRET_FILE,
+            scopes=SCOPES,
+            state=state,
+            redirect_uri=url_for("oauth2callback", _external=True)
+        )
 
-    flow.fetch_token(authorization_response=request.url)
+        flow.fetch_token(authorization_response=request.url)
+    
+    except Exception as e:
+        print(f"❌ OAuth Error: {str(e)}")
+        # Check if it's a scope warning that we can handle
+        if "Scope has changed" in str(e):
+            print("⚠️  Gmail scope was not granted. App will work with limited functionality.")
+            # Still try to get basic credentials if possible
+            try:
+                flow = Flow.from_client_secrets_file(
+                    CLIENT_SECRET_FILE,
+                    scopes=["https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email", "openid"],
+                    state=state,
+                    redirect_uri=url_for("oauth2callback", _external=True)
+                )
+                flow.fetch_token(authorization_response=request.url)
+            except:
+                flash("Authentication failed. Please check your Google Cloud Console setup.", "error")
+                return redirect(url_for("landing"))
+        else:
+            flash(f"Authentication failed: {str(e)}", "error")
+            return redirect(url_for("landing"))
 
     creds = flow.credentials
 
