@@ -1,82 +1,52 @@
 {% extends "base.html" %}
-{% block title %}Project LUMEN - Smart Finance Tracker{% endblock %}
+{% block title %}Login - Lumen{% endblock %}
 
 {% block head %}
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700&display=swap"
+    rel="stylesheet">
+<style>
+    /* Override global styles for login page specific needs if any leak through */
+    .topbar {
+        display: none !important;
+    }
+
+    .main {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100%;
+        height: 100%;
+    }
+
+    body {
+        overflow-x: hidden;
+        background-color: #171716;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<style>
-    .topbar { display: none; }
-    .main { padding: 0; background: white; }
-</style>
+<div class="login-page-container">
 
-<div class="landing-container">
-    <!-- LEFT SECTION -->
-    <div class="landing-left">
-        <img src="{{ url_for('static', filename='images/hero.png') }}" class="hero-img" alt="Finance Illustration">
-        <h2 class="hero-text">Your Smart Finance & Transaction Tracker</h2>
-        
-        <div class="landing-footer">
-            <div class="disclaimer">
-                Disclaimer: This project uses your consented financial data (receipts, bank statements) to analyze spending patterns and suggest potential insights. It is not professional financial advice and should not replace consultation with a qualified financial advisor. Always consult a professional for financial planning and decisions.
-            </div>
-            <div class="footer-bottom">
-                <div>
-                    <span style="font-size: 14px;">◼</span> Project LUMEN - All rights reserved - 2025
-                </div>
-                <div class="footer-links">
-                    <a href="#">ABOUT US</a>
-                    <a href="#">COMMUNITY</a>
-                    <a href="#">BLOG</a>
-                </div>
-                <div class="social-section">
-                    <span>FOLLOW US ON</span>
-                    <div class="social-icons">
-                        <a href="#">📷</a>
-                        <a href="#">f</a>
-                        <a href="#">𝕏</a>
-                    </div>
-                    <div class="email-input-wrapper">
-                        <input type="email" placeholder="Enter email address for updates">
-                        <button>→</button>
-                    </div>
-                </div>
-            </div>
+    <!-- Left Side: Hero Image -->
+    <div class="login-hero-section">
+        <div class="login-hero-overlay"></div>
+        <div class="login-hero-quote">
+            I don’t have to worry about any thing because I have <strong>LUMEN</strong>
         </div>
     </div>
 
-    <!-- RIGHT SECTION -->
-    <div class="landing-right">
-        <div class="login-box">
-            <h1 class="title">Project LUMEN</h1>
-            <p class="subtitle">Gmail Integration Login</p>
+    <!-- Right Side: Login Content -->
+    <div class="login-content-section">
+        <div class="login-content-inner">
+            <h1 class="lumen-logo-title">LUMEN</h1>
+            <p class="lumen-subtitle">Smart Finance Tracker</p>
 
-            <a class="gmail-sync-button" href="{{ url_for('auth_google') }}">
-                <span class="icon">📧</span>
-                <div class="button-content">
-                    <div class="main-text">Login</div>
-                    <div class="sub-label">Secure OAuth 2.0 Login</div>
-                </div>
-                <span class="lock-icon">🔒</span>
+            <a href="{{ url_for('auth_google') }}" class="google-login-btn">
+                Google
             </a>
-
-            <div class="login-disclaimer">
-                This project uses your consented financial data (receipts, bank statements) to analyze spending patterns and suggest potential insights. It is not professional financial advice and should not replace consultation with a qualified financial advisor. Always consult a professional for financial planning and decisions.
-            </div>
-
-            <div class="features-section">
-                <p class="features-title">Securely connect your Gmail account to:</p>
-                <ul class="features-list">
-                    <li>✓ Sync invoice emails with PDF attachments</li>
-                    <li>✓ Parse banking transaction notifications</li>
-                    <li>✓ Analyze spending patterns</li>
-                    <li>✓ Download receipts instantly</li>
-                </ul>
-            </div>
-
-            <a href="#" class="back-link">← Back to Main App</a>
         </div>
     </div>
+
 </div>
 {% endblock %}
