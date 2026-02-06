@@ -1469,19 +1469,18 @@ select:focus {
 .login-hero-quote {
     position: absolute;
     left: 40px;
-    bottom: 100px;
-    max-width: 400px;
+    bottom: 60px;
+    max-width: 280px;
     z-index: 10;
 
     font-family: 'Inter', sans-serif;
     font-style: normal;
     font-weight: 400;
-    font-size: 20px;
-    line-height: 24px;
-    text-align: right;
-    color: #171716;
-    /* Per Figma requirement */
-    /* Ensure visibility if needed, but sticking to design spec first. */
+    font-size: 18px;
+    line-height: 26px;
+    text-align: center;
+    color: #FFFFFF;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 /* RIGHT SIDE: CONTENT */
@@ -1504,16 +1503,16 @@ select:focus {
     max-width: 450px;
 }
 
-/* LUMEN Title - Large Thin */
+/* LUMEN Title - Wireframe Outline Effect */
 .lumen-logo-title {
     font-family: 'Inter', sans-serif;
     font-weight: 100;
-    /* Thin */
     font-size: 96px;
     line-height: 1;
-    color: #FFFFFF;
-    margin-bottom: 16px;
-    letter-spacing: -2px;
+    color: transparent;
+    -webkit-text-stroke: 1px #FFFFFF;
+    margin-bottom: 24px;
+    letter-spacing: 8px;
 }
 
 /* Subtitle: "Smart Finance Tracker" */
@@ -1587,6 +1586,7 @@ select:focus {
 
     .lumen-logo-title {
         font-size: 64px;
+        letter-spacing: 4px;
     }
 
     .lumen-subtitle {
