@@ -1537,15 +1537,15 @@ select:focus {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 245px;
+    width: 280px;
     height: 60px;
     border: 1px solid #FFFFFF;
     border-radius: 50px;
     background: transparent;
 
     font-family: 'Inter', sans-serif;
-    font-weight: 200;
-    font-size: 28px;
+    font-weight: 300;
+    font-size: 20px;
     line-height: normal;
     color: #FFFFFF;
     text-decoration: none;
