@@ -1448,9 +1448,9 @@ select:focus {
     position: relative;
     width: 60%;
     height: 100%;
-    background-image: url('../images/hero.png');
+    background-image: url('../images/image.png');
     background-size: cover;
-    background-position: center;
+    background-position: center left;
 }
 
 /* Gradient Overlay */
@@ -1469,18 +1469,17 @@ select:focus {
 .login-hero-quote {
     position: absolute;
     left: 40px;
-    bottom: 60px;
-    max-width: 280px;
+    bottom: 80px;
+    max-width: 247px;
     z-index: 10;
 
     font-family: 'Inter', sans-serif;
     font-style: normal;
     font-weight: 400;
-    font-size: 18px;
-    line-height: 26px;
-    text-align: center;
-    color: #FFFFFF;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    font-size: 20px;
+    line-height: 24px;
+    text-align: right;
+    color: #171716;
 }
 
 /* RIGHT SIDE: CONTENT */
