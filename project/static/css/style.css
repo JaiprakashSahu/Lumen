@@ -1465,20 +1465,20 @@ select:focus {
     pointer-events: none;
 }
 
-/* Hero Quote */
+/* Hero Quote - Thought from the sitting guy */
 .login-hero-quote {
     position: absolute;
-    left: 40px;
-    bottom: 80px;
-    max-width: 247px;
+    left: 60px;
+    top: 58%;
+    max-width: 220px;
     z-index: 10;
 
     font-family: 'Inter', sans-serif;
-    font-style: normal;
+    font-style: italic;
     font-weight: 400;
-    font-size: 20px;
-    line-height: 24px;
-    text-align: right;
+    font-size: 18px;
+    line-height: 26px;
+    text-align: center;
     color: #171716;
 }
 
@@ -1502,7 +1502,14 @@ select:focus {
     max-width: 450px;
 }
 
-/* LUMEN Title - Wireframe Outline Effect */
+/* LUMEN Logo Image */
+.lumen-logo-img {
+    max-width: 400px;
+    height: auto;
+    margin-bottom: 24px;
+}
+
+/* LUMEN Title - Fallback Text Style */
 .lumen-logo-title {
     font-family: 'Inter', sans-serif;
     font-weight: 100;
