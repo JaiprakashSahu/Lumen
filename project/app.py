@@ -970,10 +970,13 @@ def add_wishlist_item():
     
     try:
         # Get user email
-        creds = Credentials(**session["credentials"])
-        gmail = build("gmail", "v1", credentials=creds)
-        profile = gmail.users().getProfile(userId="me").execute()
-        user_email = profile.get("emailAddress")
+        user_email = session.get("user_email")
+        if not user_email:
+            creds = Credentials(**session["credentials"])
+            gmail = build("gmail", "v1", credentials=creds)
+            profile = gmail.users().getProfile(userId="me").execute()
+            user_email = profile.get("emailAddress")
+            session["user_email"] = user_email
         
         # Get form data
         data = request.get_json() if request.is_json else request.form

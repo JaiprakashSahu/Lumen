@@ -6,6 +6,7 @@ Provides intelligent purchase recommendations based on spending analytics
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
+import json
 
 load_dotenv()
 
@@ -85,7 +86,6 @@ Return ONLY valid JSON with these exact fields. No markdown, no explanation."""
             content = content.replace("```", "").strip()
         
         # Parse JSON
-        import json
         advice = json.loads(content)
         
         # Validate required fields
