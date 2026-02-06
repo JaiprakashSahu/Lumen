@@ -5,61 +5,91 @@
 {% endblock %}
 
 {% block content %}
-{% set data = chart_data | safe %}
-<div class="dashboard">
-  <div class="left-col">
-    <div class="panel big">
-      <canvas id="donutChart" data-chart='{{ data | safe }}'></canvas>
+<div class="dashboard-grid">
+  <!-- Row 1: Metrics -->
+  <div class="metrics-row">
+    {% set d = chart_data | from_json %}
+    <div class="card card-purple">
+      <span class="card-chip">Total Debit</span>
+      <div class="metric-value">₹{{ d.net_debit }}</div>
     </div>
-
-    <div class="panel medium">
-      <div class="toggle">
-        <button class="toggle-active">Daily</button>
-        <button>Monthly</button>
-      </div>
-      <div class="chart-wrap">
-        <canvas id="lineChart" data-chart='{{ data | safe }}'></canvas>
-      </div>
+    <div class="card card-purple">
+      <span class="card-chip">Total Credit</span>
+      <div class="metric-value">₹{{ d.net_credit }}</div>
     </div>
-
-    <div class="panel anomalies">
-      <h3>ANOMALIES</h3>
-      <ul>
-        {% set d = chart_data | from_json %}
-        {% for a in d.anomalies %}
-          <li>{{ a }}</li>
-        {% endfor %}
-      </ul>
+    <div class="card card-purple">
+      <span class="card-chip">Net Flow</span>
+      <div class="metric-value">₹{{ d.net_credit - d.net_debit }}</div>
+    </div>
+    <div class="card card-purple">
+      <span class="card-chip">Status</span>
+      <div class="metric-value">Active</div>
     </div>
   </div>
 
-  <div class="right-col">
-    <div class="panel upload">
+  <!-- Row 2: Charts -->
+  <div class="charts-row">
+    {% set data = chart_data | safe %}
+    <!-- Donut Chart -->
+    <div class="card card-sage">
+      <div class="chart-header" style="text-align: center;">
+        <h3>Distribution</h3>
+      </div>
+      <div class="donut-container">
+        <canvas id="donutChart" data-chart='{{ data }}'></canvas>
+      </div>
+      <div class="panel small" style="margin-top:20px; text-align:center;">
+        <h3>Mini View</h3>
+        <div style="height:100px; width:100px; margin:0 auto;">
+          <canvas id="miniDonut" data-chart='{{ data }}'></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Line Chart -->
+    <div class="card card-mustard">
+      <div class="chart-header" style="display:flex; justify-content:space-between;">
+        <h3>Spending Trend</h3>
+        <div class="toggle-pill-container">
+          <button class="toggle-btn active">Daily</button>
+          <button class="toggle-btn">Monthly</button>
+        </div>
+      </div>
+      <div class="chart-container" style="height: 300px;">
+        <canvas id="lineChart" data-chart='{{ data }}'></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3: Bottom Panels -->
+  <div class="bottom-row">
+    <div class="card card-orange">
+      <h3>Anomalies</h3>
+      <ul>
+        {% set d = chart_data | from_json %}
+        {% for a in d.anomalies %}
+        <li>{{ a }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="card card-outline" style="border-style: dashed; text-align: center;">
+      <h3>Upload Files</h3>
       <form method="post" action="#" enctype="multipart/form-data">
-        <label class="upload-label">⬆ UPLOAD FILES</label>
-        <input type="file" name="file">
-        <button class="btn-primary" type="submit">Upload</button>
+        <input type="file" name="file" style="margin-bottom:10px;">
+        <button class="btn-primary btn-pill" type="submit">Upload</button>
       </form>
     </div>
 
-    <div class="panel notes">
+    <div class="card card-outline">
+      <h3>Notes</h3>
       <ul>
         <li>You need to pay wifi bills on 20th November.</li>
         <li>You usually buy groceries around the 10th — time to restock</li>
       </ul>
     </div>
-
-    <div class="panel small">
-      <h4>Your most consistent spending last month</h4>
-      <canvas id="miniDonut" data-chart='{{ data | safe }}'></canvas>
-    </div>
-
-    <div class="panel moneyflow">
-      <h4>Money Flow</h4>
-      {% set d = chart_data | from_json %}
-      <p>Net Credit : ₹{{ d.net_credit }} &nbsp;&nbsp;&nbsp;&nbsp; Net Debit : ₹{{ d.net_debit }}</p>
-    </div>
   </div>
+
 </div>
 {% endblock %}
 

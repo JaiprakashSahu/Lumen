@@ -2,333 +2,147 @@
 {% block title %}Dashboard - Lumen{% endblock %}
 
 {% block head %}
-<style>
-    /* Hide default topbar */
-    .topbar {
-        display: none !important;
-    }
-
-    .main {
-        padding: 0 !important;
-    }
-
-    /* Profile Dropdown Styles */
-    .profile-dropdown {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: #ffffff;
-        border-radius: 12px;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-        z-index: 1000;
-        margin-top: 12px;
-        overflow: hidden;
-        animation: dropdownSlide 0.2s ease;
-    }
-
-    @keyframes dropdownSlide {
-        from {
-            opacity: 0;
-            transform: translateY(-10px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    .dropdown-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 16px;
-        background: #f8fafc;
-    }
-
-    .dropdown-avatar {
-        width: 48px;
-        height: 48px;
-        border-radius: 50%;
-        background: #1a365d;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-    }
-
-    .dropdown-info {
-        flex: 1;
-    }
-
-    .dropdown-name {
-        font-size: 14px;
-        font-weight: 600;
-        color: #1a365d;
-        margin-bottom: 2px;
-    }
-
-    .dropdown-email {
-        font-size: 12px;
-        color: #718096;
-    }
-
-    .dropdown-divider {
-        height: 1px;
-        background: #e2e8f0;
-    }
-
-    .dropdown-item {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 14px 16px;
-        color: #4a5568;
-        text-decoration: none;
-        font-size: 14px;
-        font-weight: 500;
-        transition: all 0.2s;
-    }
-
-    .dropdown-item:hover {
-        background: #f8fafc;
-    }
-
-    .dropdown-item.logout-item {
-        color: #dc2626;
-    }
-
-    .dropdown-item.logout-item:hover {
-        background: #fef2f2;
-    }
-
-    .sidebar-profile:hover .profile-avatar {
-        transform: scale(1.05);
-        transition: transform 0.2s;
-    }
-</style>
+<!-- No local styles needed, using global style.css -->
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-layout">
+<div class="dashboard-header" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 class="page-title" style="margin: 0;">Dashboard</h1>
+        <button class="btn-primary btn-pill" onclick="refreshAnalytics()">
+            🔄 Refresh Data
+        </button>
+    </div>
+</div>
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-        <div class="sidebar-profile" onclick="toggleProfileDropdown()" style="cursor: pointer; position: relative;">
-            <div class="profile-avatar">👤</div>
-            <div class="profile-name">{{ session.get('user_name', 'LUMEN User') }}</div>
-            <div class="profile-email">{{ session.get('user_email', 'finance@lumen.app') }}</div>
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="flash-wrap">
+    {% for category, message in messages %}
+    <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
 
-            <!-- Profile Dropdown -->
-            <div id="profileDropdown" class="profile-dropdown" style="display: none;">
-                <div class="dropdown-header">
-                    <div class="dropdown-avatar">👤</div>
-                    <div class="dropdown-info">
-                        <div class="dropdown-name">{{ session.get('user_name', 'LUMEN User') }}</div>
-                        <div class="dropdown-email">{{ session.get('user_email', 'finance@lumen.app') }}</div>
-                    </div>
+<!-- Loading State -->
+<div id="loading" style="text-align: center; padding: 60px; color: #718096;">
+    <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+    <div>Loading analytics...</div>
+</div>
+
+<!-- Error State -->
+<div id="error" class="flash error" style="display: none;"></div>
+
+<!-- Dashboard Content -->
+<div id="content" class="dashboard-grid" style="display: none;">
+
+    <!-- ROW 1: METRICS -->
+    <div class="metrics-row">
+        <!-- Total Debit -->
+        <div class="card card-purple">
+            <span class="card-chip">Total Debit</span>
+            <div class="metric-value" id="debitTotal">₹0</div>
+        </div>
+
+        <!-- Total Credit -->
+        <div class="card card-purple">
+            <span class="card-chip">Total Credit</span>
+            <div class="metric-value" id="creditTotal">₹0</div>
+        </div>
+
+        <!-- Net Flow -->
+        <div class="card card-purple">
+            <span class="card-chip">Net Flow</span>
+            <div class="metric-value" id="netFlow">₹0</div>
+        </div>
+
+        <!-- Transactions -->
+        <div class="card card-purple">
+            <span class="card-chip">Transactions</span>
+            <div class="metric-value" id="txnCount">0</div>
+        </div>
+    </div>
+
+    <!-- ROW 2: CHARTS -->
+    <div class="charts-row">
+        <!-- Left: Expenditure Chart (Mustard) -->
+        <div class="card card-mustard">
+            <div class="chart-header" style="display: flex; justify-content: space-between; margin-bottom: 16px;">
+                <h3>Expenditure</h3>
+                <div class="toggle-pill-container">
+                    <button class="toggle-btn active">Monthly</button>
+                    <button class="toggle-btn">Weekly</button>
                 </div>
-                <div class="dropdown-divider"></div>
-                <a href="{{ url_for('logout') }}" class="dropdown-item logout-item">
-                    <span>🚪</span>
-                    <span>Logout</span>
-                </a>
+            </div>
+            <div class="chart-container" style="height: 300px;">
+                <canvas id="barChart"></canvas>
             </div>
         </div>
 
+        <!-- Right: Expenditure Split (Sage) -->
+        <div class="card card-sage">
+            <div class="chart-header" style="margin-bottom: 16px; text-align: center;">
+                <h3>Expenditure Split</h3>
+            </div>
+            <!-- Month Selector -->
+            <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 20px;">
+                <button class="btn-secondary btn-pill"
+                    style="padding: 4px 12px; font-size: 12px; border-color: rgba(0,0,0,0.2); color: inherit;">←</button>
+                <div style="font-weight: 600; font-size: 14px;">February 2026</div>
+                <button class="btn-secondary btn-pill"
+                    style="padding: 4px 12px; font-size: 12px; border-color: rgba(0,0,0,0.2); color: inherit;">→</button>
+            </div>
 
-        <nav class="sidebar-nav">
-            <a href="{{ url_for('dashboard_analytics') }}" class="nav-item active">
-                <span class="nav-icon">🏠</span>
-                <span>Dashboard</span>
-            </a>
-            <a href="{{ url_for('transactions_page') }}" class="nav-item">
-                <span class="nav-icon">💳</span>
-                <span>Transactions</span>
-            </a>
-            <a href="{{ url_for('receipts_page') }}" class="nav-item">
-                <span class="nav-icon">📄</span>
-                <span>Receipts</span>
-            </a>
-            <a href="{{ url_for('wishlist_page') }}" class="nav-item">
-                <span class="nav-icon">💝</span>
-                <span>Wishlist</span>
-            </a>
-        </nav>
-
-        <div class="sidebar-footer">
-            <a href="{{ url_for('sync_gmail') }}" class="sync-button">
-                🔄 Sync Gmail
-            </a>
+            <div class="donut-container">
+                <canvas id="donutChart"></canvas>
+            </div>
+            <div class="donut-legend" id="donutLegend" style="margin-top: 16px;">
+                <!-- Filled by JS -->
+            </div>
         </div>
-    </aside>
+    </div>
 
-    <!-- MAIN CONTENT -->
-    <main class="dashboard-content analytics-dashboard">
-
-        <!-- Flash Messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="flash-wrap">
-            {% for category, message in messages %}
-            <div class="flash {{ category }}">{{ message }}</div>
-            {% endfor %}
+    <!-- ROW 3: ALERTS & INSIGHTS -->
+    <div class="bottom-row">
+        <!-- Detected Patterns (Orange) -->
+        <div class="card card-orange">
+            <div class="chart-header">
+                <h3>Detected Pattern</h3>
+            </div>
+            <ul id="patternsList" style="margin-left: 20px; color: rgba(0,0,0,0.7); font-weight: 500;">
+                <li>Analyzing patterns...</li>
+            </ul>
         </div>
-        {% endif %}
-        {% endwith %}
 
-        <!-- Header -->
-        <div class="dashboard-header">
-            <h1 class="dashboard-title">Dashboard</h1>
-            <div class="header-actions">
-                <button class="btn-primary" onclick="refreshAnalytics()">
-                    🔄 Refresh
-                </button>
+        <!-- AI Insights (Outline/Card) -->
+        <div class="card card-outline">
+            <div class="chart-header">
+                <h3
+                    style="color: var(--text-main); border: 1px solid var(--border-color); display: inline-block; padding: 4px 12px; border-radius: 20px;">
+                    AI Insight</h3>
+            </div>
+            <div id="aiSummary" style="color: var(--text-muted); line-height: 1.6; margin-top: 12px;">
+                <!-- AI content -->
+                <ul id="recommendationsList" style="list-style: none; padding: 0;">
+                    <!-- Recommendations injected here -->
+                </ul>
             </div>
         </div>
 
-        <!-- Loading State -->
-        <div id="loading" style="text-align: center; padding: 60px; color: #718096;">
-            <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
-            <div>Loading analytics...</div>
+        <!-- Upload Receipt (Hidden/Optional or integrated?) -->
+        <!-- Keeping it simple as per redesign request focusing on visual layout for dashboard -->
+        <div class="card card-outline" style="text-align: center; border-style: dashed;">
+            <h3 style="color: var(--text-muted);">Quick File Upload</h3>
+            <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: center;">
+                <input type="file" id="receiptUpload" accept=".jpg,.jpeg,.png,.pdf" style="width: auto;">
+                <button class="btn-primary btn-pill" onclick="uploadReceiptFile()">Upload</button>
+            </div>
         </div>
 
-        <!-- Error State -->
-        <div id="error" class="flash error" style="display: none;"></div>
+    </div>
 
-        <!-- Dashboard Content -->
-        <div id="content" style="display: none;">
-
-            <!-- STAT CARDS -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-info">
-                        <div class="stat-label">Total Debit</div>
-                        <div class="stat-value" id="debitTotal">₹0</div>
-                    </div>
-                    <div class="stat-icon navy">📤</div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-info">
-                        <div class="stat-label">Total Credit</div>
-                        <div class="stat-value" id="creditTotal">₹0</div>
-                    </div>
-                    <div class="stat-icon orange">📥</div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-info">
-                        <div class="stat-label">Net Flow</div>
-                        <div class="stat-value" id="netFlow">₹0</div>
-                    </div>
-                    <div class="stat-icon navy">💰</div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-info">
-                        <div class="stat-label">Transactions</div>
-                        <div class="stat-value" id="txnCount">0</div>
-                    </div>
-                    <div class="stat-icon orange">⭐</div>
-                </div>
-            </div>
-
-            <!-- CHARTS SECTION -->
-            <div class="charts-section">
-                <!-- Bar Chart -->
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3 class="chart-title">Monthly Spending</h3>
-                        <div class="chart-legend">
-                            <div class="legend-item">
-                                <span class="legend-dot navy"></span>
-                                <span>Debit</span>
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-dot orange"></span>
-                                <span>Credit</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="barChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Donut Chart -->
-                <div class="donut-card">
-                    <div class="chart-header" style="justify-content: center;">
-                        <h3 class="chart-title">Category Split</h3>
-                    </div>
-                    <div class="donut-container">
-                        <canvas id="donutChart"></canvas>
-                    </div>
-                    <div class="donut-legend" id="donutLegend">
-                        <!-- Filled by JS -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- BOTTOM SECTION -->
-            <div class="bottom-section">
-                <!-- AI Insights -->
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3 class="chart-title">🤖 AI Insights</h3>
-                    </div>
-                    <div id="aiSummary" style="color: #4a5568; line-height: 1.7; font-size: 14px;">
-                        Loading insights...
-                    </div>
-                </div>
-
-                <!-- Upload Receipt -->
-                <div class="chart-card" style="border: 2px dashed #e2e8f0; text-align: center;">
-                    <div class="chart-header" style="justify-content: center;">
-                        <h3 class="chart-title">📤 Upload Receipt</h3>
-                    </div>
-                    <div style="padding: 20px 0;">
-                        <div style="font-size: 40px; margin-bottom: 16px;">📄</div>
-                        <input type="file" id="receiptUpload" accept=".jpg,.jpeg,.png,.pdf"
-                            style="margin-bottom: 16px;">
-                        <br>
-                        <button class="btn-primary" onclick="uploadReceiptFile()">
-                            Upload
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Patterns -->
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3 class="chart-title">🔍 Detected Patterns</h3>
-                    </div>
-                    <ul id="patternsList" style="list-style: none; padding: 0; margin: 0;">
-                        <li style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; color: #4a5568; font-size: 13px;">
-                            Analyzing patterns...
-                        </li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- RECOMMENDATIONS -->
-            <div style="margin-top: 24px;">
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3 class="chart-title">💡 Savings Recommendations</h3>
-                    </div>
-                    <ul id="recommendationsList" style="list-style: none; padding: 0; margin: 0;">
-                        <li
-                            style="padding: 12px; margin-bottom: 8px; background: rgba(26, 54, 93, 0.05); border-radius: 8px; border-left: 3px solid #f59e0b; color: #4a5568; font-size: 14px;">
-                            Analyzing your spending patterns...
-                        </li>
-                    </ul>
-                </div>
-            </div>
-
-        </div>
-    </main>
 </div>
 
 <script>
@@ -354,8 +168,9 @@
     let currentData = null;
 
     // Chart.js Configuration for new design
-    Chart.defaults.color = '#4a5568';
-    Chart.defaults.borderColor = '#e2e8f0';
+    // Colors tuned for dark pastel theme
+    Chart.defaults.color = 'rgba(255, 255, 255, 0.6)';
+    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
     Chart.defaults.plugins.legend.display = false;
 
     let barChartInstance = null;
@@ -383,7 +198,7 @@
             displayAnalytics(data);
 
             loading.style.display = 'none';
-            content.style.display = 'block';
+            content.style.display = 'grid'; // Changed to grid
 
         } catch (err) {
             console.error('Analytics error:', err);
@@ -398,10 +213,7 @@
         document.getElementById('debitTotal').textContent = `₹${(data.debit_total || 0).toLocaleString()}`;
         document.getElementById('creditTotal').textContent = `₹${(data.credit_total || 0).toLocaleString()}`;
         document.getElementById('netFlow').textContent = `₹${(data.net_flow || 0).toLocaleString()}`;
-        document.getElementById('txnCount').textContent = data.transaction_count || '0';
-
-        // Update AI summary
-        document.getElementById('aiSummary').textContent = data.ai_summary || 'No insights available yet. Sync your Gmail to get started!';
+        document.getElementById('txnCount').textContent = data.transaction_count || (data.transactions ? data.transactions.length : '0'); // Fallback logic
 
         // Create Bar Chart
         createBarChart(data);
@@ -413,7 +225,7 @@
         displayPatterns(data.patterns || []);
 
         // Display recommendations
-        displayRecommendations(data.recommendations || []);
+        displayRecommendations(data.recommendations || [], data.ai_summary);
     }
 
     function createBarChart(data) {
@@ -431,6 +243,14 @@
             last6Months.push(months[(currentMonth - i + 12) % 12]);
         }
 
+        // Dark theme colors for charts inside Mustard/Sage cards
+        // Actually, inside a Mustard card (Light BG), we want DARK bars.
+        // The text color inside mustard card is dark (from CSS).
+        // So charts should use dark colors.
+
+        const barColorDebit = '#1a365d'; // Dark Navy
+        const barColorCredit = '#4a5568'; // Dark Grey for contrast
+
         barChartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -439,14 +259,14 @@
                     {
                         label: 'Debit',
                         data: [4500, 3200, 5100, 2800, 4200, data.debit_total || 3500],
-                        backgroundColor: '#1a365d',
+                        backgroundColor: '#000000', // Black for stark contrast on mustard
                         borderRadius: 4,
                         barThickness: 20
                     },
                     {
                         label: 'Credit',
                         data: [2000, 4500, 3000, 5200, 2100, data.credit_total || 4000],
-                        backgroundColor: '#f59e0b',
+                        backgroundColor: 'rgba(0,0,0,0.4)',
                         borderRadius: 4,
                         barThickness: 20
                     }
@@ -468,11 +288,11 @@
                 scales: {
                     x: {
                         grid: { display: false },
-                        ticks: { color: '#718096', font: { size: 11 } }
+                        ticks: { color: 'rgba(0,0,0,0.6)', font: { size: 11 } } // Dark ticks
                     },
                     y: {
-                        grid: { color: '#e2e8f0' },
-                        ticks: { color: '#718096', font: { size: 11 } },
+                        grid: { color: 'rgba(0,0,0,0.1)' },
+                        ticks: { color: 'rgba(0,0,0,0.6)', font: { size: 11 } },
                         beginAtZero: true
                     }
                 }
@@ -488,10 +308,10 @@
             donutChartInstance.destroy();
         }
 
-        // Use category data or defaults
         const labels = data.category_labels || ['Shopping', 'Food', 'Bills', 'Other'];
         const values = data.category_values || [35, 25, 20, 20];
-        const colors = ['#1a365d', '#f59e0b', '#3b82f6', '#10b981'];
+        // Dark/Neutral colors for Sage background
+        const colors = ['#1a202c', '#4a5568', '#718096', '#a0aec0'];
 
         donutChartInstance = new Chart(ctx, {
             type: 'doughnut',
@@ -501,7 +321,7 @@
                     data: values,
                     backgroundColor: colors,
                     borderWidth: 0,
-                    cutout: '70%'
+                    cutout: '60%'
                 }]
             },
             options: {
@@ -511,10 +331,7 @@
                     legend: { display: false },
                     tooltip: {
                         backgroundColor: '#1a365d',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        padding: 12,
-                        cornerRadius: 8
+                        titleColor: '#fff'
                     }
                 }
             }
@@ -523,9 +340,12 @@
         // Update legend
         const legendContainer = document.getElementById('donutLegend');
         legendContainer.innerHTML = labels.map((label, i) => `
-            <div class="donut-legend-item">
-                <span class="donut-legend-dot" style="background: ${colors[i]}"></span>
-                <span>${label}</span>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: rgba(0,0,0,0.7);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                     <span style="width: 8px; height: 8px; border-radius: 50%; background: ${colors[i]}"></span>
+                     <span>${label}</span>
+                </div>
+                <strong>${values[i]}%</strong>
             </div>
         `).join('');
     }
@@ -537,28 +357,34 @@
         if (patterns.length > 0) {
             patterns.forEach(pattern => {
                 const li = document.createElement('li');
-                li.style.cssText = 'padding: 8px 0; border-bottom: 1px solid #e2e8f0; color: #4a5568; font-size: 13px;';
-                li.textContent = pattern;
+                li.style.cssText = 'padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.1); margin-bottom: 4px;';
+                li.textContent = '• ' + pattern;
                 list.appendChild(li);
             });
         } else {
-            list.innerHTML = '<li style="padding: 8px 0; color: #718096; font-size: 13px;">No patterns detected yet</li>';
+            list.innerHTML = '<li>No patterns detected yet</li>';
         }
     }
 
-    function displayRecommendations(recommendations) {
+    function displayRecommendations(recommendations, summary) {
         const list = document.getElementById('recommendationsList');
         list.innerHTML = '';
+
+        // Add summary paragraph first if exists
+        if (summary) {
+            const p = document.createElement('p');
+            p.textContent = summary;
+            p.style.marginBottom = '12px';
+            list.appendChild(p);
+        }
 
         if (recommendations.length > 0) {
             recommendations.forEach(rec => {
                 const li = document.createElement('li');
-                li.style.cssText = 'padding: 12px; margin-bottom: 8px; background: rgba(26, 54, 93, 0.05); border-radius: 8px; border-left: 3px solid #f59e0b; color: #4a5568; font-size: 14px;';
-                li.textContent = '💡 ' + rec;
+                li.style.cssText = 'padding: 8px 0; font-size: 14px; display: flex; gap: 8px;';
+                li.innerHTML = '<span style="color: var(--card-mustard);">•</span> ' + rec;
                 list.appendChild(li);
             });
-        } else {
-            list.innerHTML = '<li style="padding: 12px; color: #718096; font-size: 13px;">No recommendations yet. Add more transactions!</li>';
         }
     }
 
@@ -566,7 +392,6 @@
         loadAnalytics();
     }
 
-    // Toast notification
     function showToast(message, isError = false) {
         const toast = document.createElement('div');
         toast.style.cssText = `
@@ -584,47 +409,28 @@
         `;
         toast.textContent = message;
         document.body.appendChild(toast);
-
         setTimeout(() => toast.remove(), 4000);
     }
 
-    // Upload receipt
+    // Simple Upload
     async function uploadReceiptFile() {
         const input = document.getElementById('receiptUpload');
         const file = input.files[0];
-
-        if (!file) {
-            showToast('Please select a file first', true);
-            return;
-        }
+        if (!file) { showToast('Select file', true); return; }
 
         const formData = new FormData();
         formData.append('file', file);
-
-        showToast('Uploading receipt...');
+        showToast('Uploading...');
 
         try {
-            const response = await fetch('/upload-receipt', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showToast(data.message || 'Receipt uploaded successfully!');
-                setTimeout(() => refreshAnalytics(), 1000);
-            } else {
-                showToast(data.error || 'Failed to upload receipt', true);
-            }
-        } catch (err) {
-            showToast('Error uploading receipt: ' + err.message, true);
-        } finally {
-            input.value = '';
-        }
+            const r = await fetch('/upload-receipt', { method: 'POST', body: formData });
+            const d = await r.json();
+            if (d.success) showToast('Done!');
+            else showToast('Failed', true);
+        } catch (e) { showToast('Error', true); }
     }
 
-    // Load analytics on page load
+    // Load on init
     document.addEventListener('DOMContentLoaded', loadAnalytics);
 </script>
 

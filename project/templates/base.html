@@ -13,37 +13,28 @@
   {% block head %}{% endblock %}
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-inner">
-      <a class="home-icon" href="{{ url_for('dashboard_analytics') }}">🏠</a>
-        <nav class="nav">
-            <a href="{{ url_for('dashboard_analytics') }}">Dashboard</a>
-            <a href="{{ url_for('receipts_page') }}">Receipts</a>
-            <a href="{{ url_for('transactions_page') }}">Transactions</a>
-            <a href="{{ url_for('sync_gmail') }}" class="sync-btn" title="Sync Gmail Data">🔄 Sync Gmail</a>
-        </nav>
-      <div class="topbar-actions">
-        <a href="{{ url_for('wishlist_page') }}" class="wishlist-btn" title="Wishlist & Smart Advisor">
-          💝
-        </a>
-        <div class="profile">◯</div>
-      </div>
-    </div>
-  </header>
+  <div class="app-container">
+    
+    <!-- Top Navigation (formerly Sidebar) -->
+    {% include "components/sidebar.html" %}
 
-  <main class="main">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flash-wrap">
-          {% for category, message in messages %}
-            <div class="flash {{ category }}">{{ message }}</div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
+    <!-- Flash Messages -->
+    <main class="main-content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-wrap">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
 
-    {% block content %}{% endblock %}
-  </main>
+      <!-- Page Content -->
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
 
   <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
   {% block scripts %}{% endblock %}

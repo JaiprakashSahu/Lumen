@@ -931,10 +931,15 @@ def wishlist_page():
         return redirect(url_for("index"))
     
     # Get user email from credentials
-    creds = Credentials(**session["credentials"])
-    gmail = build("gmail", "v1", credentials=creds)
-    profile = gmail.users().getProfile(userId="me").execute()
-    user_email = profile.get("emailAddress")
+    # Get user email from session (avoiding extra API call)
+    user_email = session.get("user_email")
+    if not user_email:
+        # Fallback if session doesn't have it (rare)
+        creds = Credentials(**session["credentials"])
+        gmail = build("gmail", "v1", credentials=creds)
+        profile = gmail.users().getProfile(userId="me").execute()
+        user_email = profile.get("emailAddress")
+        session["user_email"] = user_email
     
     # Get wishlist items for user
     wishlist_items = WishlistRepository.get_by_user(user_email)

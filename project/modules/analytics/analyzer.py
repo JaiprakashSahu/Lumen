@@ -423,10 +423,25 @@ Return ONLY valid JSON with this structure (no markdown, no code blocks):
 }}
 """
         
-        # Call LLM API
-        headers = {"Content-Type": "application/json"}
+        # LLM Provider Logic
+        provider = os.getenv("LLM_PROVIDER", "local")
+        api_key = os.getenv("GROQ_API_KEY", "")
+        
+        if provider == "groq" and api_key:
+            api_url = "https://api.groq.com/openai/v1/chat/completions"
+            model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+        else:
+            # Fallback to local/custom URL
+            api_url = LLM_API_URL
+            model = LLM_MODEL
+            headers = {"Content-Type": "application/json"}
+
         payload = {
-            "model": LLM_MODEL,
+            "model": model,
             "messages": [
                 {"role": "system", "content": "You are a financial analyst. Provide insights in valid JSON format only."},
                 {"role": "user", "content": prompt}
@@ -435,7 +450,8 @@ Return ONLY valid JSON with this structure (no markdown, no code blocks):
             "max_tokens": 1000
         }
         
-        response = requests.post(LLM_API_URL, headers=headers, json=payload, timeout=30)
+        # Increased timeout to 60s
+        response = requests.post(api_url, headers=headers, json=payload, timeout=60)
         
         if response.status_code == 200:
             result = response.json()
