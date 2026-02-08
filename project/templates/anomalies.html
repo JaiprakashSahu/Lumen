@@ -166,15 +166,21 @@
     });
 
     let currentData = null;
+    let barChartInstance = null;
+    let donutChartInstance = null;
+
+    // State for interactive features
+    let currentView = 'monthly'; // 'monthly' or 'weekly'
+    let donutMonth = new Date().getMonth() + 1; // 1-12
+    let donutYear = new Date().getFullYear();
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
 
     // Chart.js Configuration for new design
     // Colors tuned for dark pastel theme
     Chart.defaults.color = 'rgba(255, 255, 255, 0.6)';
     Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
     Chart.defaults.plugins.legend.display = false;
-
-    let barChartInstance = null;
-    let donutChartInstance = null;
 
 
     async function loadAnalytics() {
@@ -213,7 +219,7 @@
         document.getElementById('debitTotal').textContent = `₹${(data.debit_total || 0).toLocaleString()}`;
         document.getElementById('creditTotal').textContent = `₹${(data.credit_total || 0).toLocaleString()}`;
         document.getElementById('netFlow').textContent = `₹${(data.net_flow || 0).toLocaleString()}`;
-        document.getElementById('txnCount').textContent = data.transaction_count || (data.transactions ? data.transactions.length : '0'); // Fallback logic
+        document.getElementById('txnCount').textContent = data.transaction_count || (data.transactions ? data.transactions.length : '0');
 
         // Create Bar Chart
         createBarChart(data);
@@ -226,6 +232,61 @@
 
         // Display recommendations
         displayRecommendations(data.recommendations || [], data.ai_summary);
+
+        // Setup interactive listeners once
+        setupInteractiveFeatures();
+    }
+
+    function setupInteractiveFeatures() {
+        // 1. Monthly/Weekly Toggle for Bar Chart
+        const toggleBtns = document.querySelectorAll('.toggle-pill-container .toggle-btn');
+        toggleBtns.forEach(btn => {
+            btn.onclick = function () {
+                toggleBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentView = this.textContent.toLowerCase();
+                createBarChart(currentData);
+            };
+        });
+
+        // 2. Month Navigation for Donut Chart
+        const prevBtn = document.querySelector('.card-sage .btn-secondary:first-of-type');
+        const nextBtn = document.querySelector('.card-sage .btn-secondary:last-of-type');
+
+        if (prevBtn) prevBtn.onclick = () => navigateMonth(-1);
+        if (nextBtn) nextBtn.onclick = () => navigateMonth(1);
+
+        // Set initial month label for donut chart
+        const monthLabel = document.querySelector('.card-sage div[style*="font-weight: 600"]');
+        if (monthLabel) monthLabel.textContent = `${monthNames[donutMonth - 1]} ${donutYear}`;
+    }
+
+    async function navigateMonth(offset) {
+        donutMonth += offset;
+        if (donutMonth > 12) {
+            donutMonth = 1;
+            donutYear++;
+        } else if (donutMonth < 1) {
+            donutMonth = 12;
+            donutYear--;
+        }
+
+        // Update UI Label
+        const monthLabel = document.querySelector('.card-sage div[style*="font-weight: 600"]');
+        if (monthLabel) monthLabel.textContent = `${monthNames[donutMonth - 1]} ${donutYear}`;
+
+        // Show loading in donut only? For now, refresh full data for simplicity or fetch specific
+        try {
+            const response = await fetch(`/api/anomalies-data?month=${donutMonth}&year=${donutYear}`);
+            const data = await response.json();
+            if (data.success) {
+                // Update specific items
+                createDonutChart(data);
+                // We keep currentData for bar chart toggle, only update distribution parts
+                currentData.category_labels = data.category_labels;
+                currentData.category_values = data.category_values;
+            }
+        } catch (e) { console.error("Month nav error", e); }
     }
 
     function createBarChart(data) {
@@ -236,36 +297,30 @@
             barChartInstance.destroy();
         }
 
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const currentMonth = new Date().getMonth();
-        const last6Months = [];
-        for (let i = 5; i >= 0; i--) {
-            last6Months.push(months[(currentMonth - i + 12) % 12]);
+        const chartConfig = currentView === 'weekly' ? data.weekly_expenditure : data.monthly_expenditure;
+
+        if (!chartConfig || !chartConfig.labels || chartConfig.labels.length === 0) {
+            // Fallback to dummy style if data missing
+            chartConfig.labels = ['-', '-', '-', '-', '-', '-'];
+            chartConfig.debit_data = [0, 0, 0, 0, 0, 0];
+            chartConfig.credit_data = [0, 0, 0, 0, 0, 0];
         }
-
-        // Dark theme colors for charts inside Mustard/Sage cards
-        // Actually, inside a Mustard card (Light BG), we want DARK bars.
-        // The text color inside mustard card is dark (from CSS).
-        // So charts should use dark colors.
-
-        const barColorDebit = '#1a365d'; // Dark Navy
-        const barColorCredit = '#4a5568'; // Dark Grey for contrast
 
         barChartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: last6Months,
+                labels: chartConfig.labels,
                 datasets: [
                     {
                         label: 'Debit',
-                        data: [4500, 3200, 5100, 2800, 4200, data.debit_total || 3500],
-                        backgroundColor: '#000000', // Black for stark contrast on mustard
+                        data: chartConfig.debit_data,
+                        backgroundColor: '#000000',
                         borderRadius: 4,
                         barThickness: 20
                     },
                     {
                         label: 'Credit',
-                        data: [2000, 4500, 3000, 5200, 2100, data.credit_total || 4000],
+                        data: chartConfig.credit_data,
                         backgroundColor: 'rgba(0,0,0,0.4)',
                         borderRadius: 4,
                         barThickness: 20
@@ -308,10 +363,11 @@
             donutChartInstance.destroy();
         }
 
-        const labels = data.category_labels || ['Shopping', 'Food', 'Bills', 'Other'];
-        const values = data.category_values || [35, 25, 20, 20];
-        // Dark/Neutral colors for Sage background
-        const colors = ['#1a202c', '#4a5568', '#718096', '#a0aec0'];
+        const labels = data.category_labels && data.category_labels.length > 0 ? data.category_labels : ['No Data'];
+        const values = data.category_values && data.category_values.length > 0 ? data.category_values : [100];
+
+        // Define a nice palette of neutral darks/pastels
+        const colors = ['#1a202c', '#4a5568', '#718096', '#a0aec0', '#cbd5e0', '#2d3748', '#4a5568'];
 
         donutChartInstance = new Chart(ctx, {
             type: 'doughnut',
@@ -321,7 +377,8 @@
                     data: values,
                     backgroundColor: colors,
                     borderWidth: 0,
-                    cutout: '60%'
+                    cutout: '70%',
+                    hoverOffset: 15
                 }]
             },
             options: {
@@ -331,7 +388,12 @@
                     legend: { display: false },
                     tooltip: {
                         backgroundColor: '#1a365d',
-                        titleColor: '#fff'
+                        titleColor: '#fff',
+                        callbacks: {
+                            label: function (context) {
+                                return `${context.label}: ${context.raw}%`;
+                            }
+                        }
                     }
                 }
             }
@@ -340,12 +402,12 @@
         // Update legend
         const legendContainer = document.getElementById('donutLegend');
         legendContainer.innerHTML = labels.map((label, i) => `
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: rgba(0,0,0,0.7);">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                     <span style="width: 8px; height: 8px; border-radius: 50%; background: ${colors[i]}"></span>
-                     <span>${label}</span>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 8px; transition: background 0.2s;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                     <span style="width: 10px; height: 10px; border-radius: 3px; background: ${colors[i % colors.length]}"></span>
+                     <span style="font-weight: 500;">${label}</span>
                 </div>
-                <strong>${values[i]}%</strong>
+                <strong style="color: #1a202c;">${values[i]}%</strong>
             </div>
         `).join('');
     }

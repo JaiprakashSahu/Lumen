@@ -670,10 +670,18 @@ def anomalies_data():
     """
     API endpoint for analytics data with caching.
     Returns charts, insights, and anomalies.
+    Supports ?month=2&year=2026 for monthly distribution data.
     """
     try:
+        # Get filters from query params
+        month = request.args.get('month')
+        year = request.args.get('year')
+        
+        # Use a parameterized cache key
+        cache_key = f"analytics_report_{month or 'latest'}_{year or 'latest'}"
+        
         # Check cache first
-        cached_data = analytics_cache.get('analytics_report')
+        cached_data = analytics_cache.get(cache_key)
         
         if cached_data:
             return jsonify({
@@ -683,10 +691,10 @@ def anomalies_data():
             })
         
         # Generate fresh analytics report
-        report = generate_analytics_report(app)
+        report = generate_analytics_report(app, month=month, year=year)
         
-        # Cache the result
-        analytics_cache.set('analytics_report', report)
+        # Cache the result (for example, for 1 hour)
+        analytics_cache.set(cache_key, report)
         
         return jsonify({
             "success": True,

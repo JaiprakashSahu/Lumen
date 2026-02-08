@@ -270,6 +270,90 @@ def compute_monthly_spending(df):
     return fig_to_base64(fig)
 
 
+def get_expenditure_data(df, period='monthly'):
+    """
+    Get raw expenditure data for bar charts.
+    
+    Args:
+        df: Transaction DataFrame
+        period: 'monthly' or 'weekly'
+        
+    Returns:
+        dict: {labels, debit_data, credit_data}
+    """
+    if df.empty:
+        return {"labels": [], "debit_data": [], "credit_data": []}
+
+    df = df[df['date'].notna()].copy()
+    if df.empty:
+        return {"labels": [], "debit_data": [], "credit_data": []}
+
+    if period == 'weekly':
+        # Last 4 weeks
+        end_date = df['date'].max()
+        start_date = end_date - timedelta(weeks=4)
+        filtered = df[df['date'] >= start_date].copy()
+        
+        # Group by week
+        filtered['week'] = filtered['date'].dt.strftime('%U') # Week number
+        
+        debit_weekly = filtered[filtered['type'] == 'debit'].groupby('week')['amount'].sum()
+        credit_weekly = filtered[filtered['type'] == 'credit'].groupby('week')['amount'].sum()
+        
+        labels = [f"Week {w}" for w in sorted(filtered['week'].unique())]
+        debit_data = [float(debit_weekly.get(w, 0)) for w in sorted(filtered['week'].unique())]
+        credit_data = [float(credit_weekly.get(w, 0)) for w in sorted(filtered['week'].unique())]
+    else:
+        # Last 6 months
+        df['month_period'] = df['date'].dt.to_period('M')
+        last_n_months = sorted(df['month_period'].unique())[-6:]
+        
+        debits = df[df['type'] == 'debit']
+        credits = df[df['type'] == 'credit']
+        
+        debit_monthly = debits.groupby('month_period')['amount'].sum()
+        credit_monthly = credits.groupby('month_period')['amount'].sum()
+        
+        labels = [m.strftime('%b') for m in last_n_months]
+        debit_data = [float(debit_monthly.get(m, 0)) for m in last_n_months]
+        credit_data = [float(credit_monthly.get(m, 0)) for m in last_n_months]
+        
+    return {
+        "labels": labels,
+        "debit_data": debit_data,
+        "credit_data": credit_data
+    }
+
+
+def get_category_distribution(df, month=None, year=None):
+    """
+    Get spending distribution by category for a specific month.
+    """
+    if df.empty:
+        return {"labels": [], "values": []}
+
+    df = df[df['type'] == 'debit'].copy()
+    if df.empty:
+        return {"labels": [], "values": []}
+
+    if month and year:
+        df = df[(df['date'].dt.month == int(month)) & (df['date'].dt.year == int(year))]
+
+    if df.empty:
+        return {"labels": ["No Data"], "values": [0]}
+
+    dist = df.groupby('category')['amount'].sum().sort_values(ascending=False)
+    total = dist.sum()
+    
+    labels = dist.index.tolist()
+    values = [round((v / total) * 100, 1) for v in dist.values]
+    
+    return {
+        "labels": labels,
+        "values": values
+    }
+
+
 def compute_money_flow(df):
     """
     Calculate total debit and credit amounts.
@@ -504,19 +588,21 @@ def _fallback_insights(df, money_flow):
     }
 
 
-def generate_analytics_report(app):
+def generate_analytics_report(app, month=None, year=None):
     """
     Generate complete analytics report with charts and insights.
     
     Args:
         app: Flask app instance
+        month: Optional month filter (1-12)
+        year: Optional year filter
         
     Returns:
         dict: Complete analytics data
     """
     start_time = time.time()
     print("\n" + "="*80)
-    print(">> Analytics started")
+    print(f">> Analytics started (Filter: {month}/{year})")
     print("="*80)
     
     # Load data
@@ -536,24 +622,24 @@ def generate_analytics_report(app):
             'ai_summary': "No transactions available for analysis.",
             'patterns': [],
             'suspicious': [],
-            'recommendations': []
+            'recommendations': [],
+            'category_labels': [],
+            'category_values': [],
+            'monthly_expenditure': {"labels": [], "debit_data": [], "credit_data": []},
+            'weekly_expenditure': {"labels": [], "debit_data": [], "credit_data": []}
         }
     
     # Generate charts
     print(">> Generating charts...")
     pie_chart = compute_category_pie(df)
-    print("   ✅ Pie chart")
-    
     top4_chart = compute_top4_categories(df)
-    print("   ✅ Top 4 chart")
-    
     daily_chart = compute_daily_spending(df)
-    print("   ✅ Daily chart")
-    
     monthly_chart = compute_monthly_spending(df)
-    print("   ✅ Monthly chart")
     
-    print(">> Generated charts OK")
+    # Data for frontend Chart.js
+    category_dist = get_category_distribution(df, month, year)
+    monthly_exp = get_expenditure_data(df, period='monthly')
+    weekly_exp = get_expenditure_data(df, period='weekly')
     
     # Calculate money flow
     money_flow = compute_money_flow(df)
@@ -580,5 +666,9 @@ def generate_analytics_report(app):
         'ai_summary': ai_insights.get('summary', 'No summary available'),
         'patterns': ai_insights.get('patterns', []) + suspicious_data['patterns'],
         'suspicious': suspicious_data['suspicious'],
-        'recommendations': ai_insights.get('savings_tips', [])
+        'recommendations': ai_insights.get('savings_tips', []),
+        'category_labels': category_dist['labels'],
+        'category_values': category_dist['values'],
+        'monthly_expenditure': monthly_exp,
+        'weekly_expenditure': weekly_exp
     }
