@@ -110,6 +110,40 @@
     margin-top: 8px;
   }
 
+  /* Animated Quote Styles */
+  .animated-quote {
+    animation: fadeInUp 1.5s ease-out forwards;
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  .animated-quote.vanish {
+    animation: fadeOutDown 1.5s ease-in forwards;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeOutDown {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-30px);
+      visibility: hidden;
+    }
+  }
+
   /* Right Side: Login Form */
   .login-section {
     width: 50%;
@@ -240,7 +274,7 @@
     <img src="{{ url_for('static', filename='images/image.png') }}" alt="Futuristic City" class="hero-image">
 
     <div class="hero-overlay">
-      <div class="hero-quote">
+      <div class="hero-quote animated-quote" id="heroQuote">
         "I don't have to worry about anything because I have LUMEN"
       </div>
     </div>
@@ -290,4 +324,14 @@
   </div>
 
 </div>
+
+<script>
+  // Make the quote disappear after 10 seconds
+  setTimeout(function() {
+    const heroQuote = document.getElementById('heroQuote');
+    if (heroQuote) {
+      heroQuote.classList.add('vanish');
+    }
+  }, 10000); // 10 seconds
+</script>
 {% endblock %}
