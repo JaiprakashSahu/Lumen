@@ -2,90 +2,99 @@
 {% block title %}Receipts - Lumen{% endblock %}
 
 {% block content %}
-<div class="page-container">
+<div class="rcpt-page">
 
   <!-- Toolbar -->
-  <div class="toolbar"
-    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding: 8px 16px; background: rgba(255,255,255,0.03); border-radius: 50px; border: 1px solid var(--border-color);">
-    <div style="display: flex; gap: 12px; align-items: center;">
-      <h2 style="margin: 0; font-size: 18px; font-weight: 600; padding: 0 12px;">Receipts & Invoices</h2>
-      <span class="chip"
-        style="background: var(--card-orange); color: var(--text-dark); padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">{{
-        receipts|length }}</span>
+  <div class="rcpt-header">
+    <div class="rcpt-header__left">
+      <h2 class="rcpt-header__title">Receipts & Invoices</h2>
+      <span class="rcpt-header__count">{{ receipts|length }}</span>
     </div>
 
-    <div class="toolbar-actions" style="display: flex; gap: 8px;">
-      <button class="btn-pill btn-secondary">
+    <div class="rcpt-header__right">
+      <button class="txn-btn txn-btn--ghost">
         🔍 Filter
       </button>
-      <a href="{{ url_for('upload_receipt') }}" class="btn-pill btn-primary">
+      <a href="{{ url_for('upload_receipt') }}" class="txn-btn txn-btn--primary">
         + Upload
       </a>
     </div>
   </div>
 
-  {% if receipts %}
-  <div class="wide-card-list">
-    {% for r in receipts %}
-    <div class="card"
-      style="background: var(--card-cream); color: var(--text-dark); margin-bottom: 12px; padding: 20px; border: none;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+  <!-- Scroll Container with Gradient Overlays -->
+  <div class="rcpt-scroll-wrapper">
+    <div class="rcpt-scroll-fade rcpt-scroll-fade--top"></div>
+    <div class="rcpt-scroll-fade rcpt-scroll-fade--bottom"></div>
 
-        <!-- Info -->
-        <div style="display: flex; gap: 16px;">
-          <div class="icon-circle" style="background: rgba(0,0,0,0.05); font-size: 24px;">📄</div>
-          <div>
-            <div style="font-weight: 700; font-size: 16px;">{{ r.vendor or 'Unknown Vendor' }}</div>
-            <div style="font-size: 13px; color: rgba(0,0,0,0.6); margin-top: 4px;">{{ r.date or 'Date unknown' }}</div>
+    <div class="rcpt-scroll-container" id="receiptScrollContainer">
+      <!-- Top spacer so first card can reach center -->
+      <div class="rcpt-scroll-spacer"></div>
 
-            <!-- Snippet -->
-            {% if r.snippet %}
-            <div style="margin-top: 8px; font-size: 12px; color: rgba(0,0,0,0.5); max-width: 400px; line-height: 1.4;">
-              {{ r.snippet[:100] }}...
+      {% if receipts %}
+        {% for r in receipts %}
+        <div class="receipt-card" data-index="{{ loop.index0 }}">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+
+            <!-- Info -->
+            <div style="display: flex; gap: 16px;">
+              <div class="icon-circle" style="background: rgba(0,0,0,0.05); font-size: 24px;">📄</div>
+              <div>
+                <div style="font-weight: 700; font-size: 16px;">{{ r.vendor or 'Unknown Vendor' }}</div>
+                <div style="font-size: 13px; color: rgba(0,0,0,0.6); margin-top: 4px;">{{ r.date or 'Date unknown' }}</div>
+
+                {% if r.snippet %}
+                <div style="margin-top: 8px; font-size: 12px; color: rgba(0,0,0,0.5); max-width: 400px; line-height: 1.4;">
+                  {{ r.snippet[:100] }}...
+                </div>
+                {% endif %}
+              </div>
             </div>
-            {% endif %}
+
+            <!-- Right Side -->
+            <div style="text-align: right;">
+              <div style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">₹{{ r.total or '0.00' }}</div>
+
+              <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+                {% if r.type == 'gmail' %}
+                <span class="chip" style="background: #fff; border: 1px solid rgba(0,0,0,0.1);">📧 Gmail</span>
+                {% else %}
+                <span class="chip" style="background: #fff; border: 1px solid rgba(0,0,0,0.1);">📤 Upload</span>
+                {% endif %}
+
+                {% if r.attachmentId and r.messageId %}
+                <a href="{{ url_for('download', message_id=r.messageId, attachment_id=r.attachmentId, filename=r.filename) }}"
+                  class="btn-pill btn-secondary"
+                  style="font-size: 12px; height: 32px; padding: 0 12px; border-color: rgba(0,0,0,0.2); color: rgba(0,0,0,0.8);">
+                  ⬇ PDF
+                </a>
+                {% else %}
+                <a href="{{ url_for('view_receipt', receipt_id=r.receipt_id) }}" class="btn-pill btn-secondary"
+                  style="font-size: 12px; height: 32px; padding: 0 12px; border-color: rgba(0,0,0,0.2); color: rgba(0,0,0,0.8);">
+                  👁 View
+                </a>
+                {% endif %}
+              </div>
+            </div>
+
           </div>
         </div>
-
-        <!-- Right Side -->
-        <div style="text-align: right;">
-          <div style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">₹{{ r.total or '0.00' }}</div>
-
-          <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
-            <!-- Type Badge -->
-            {% if r.type == 'gmail' %}
-            <span class="chip" style="background: #fff; border: 1px solid rgba(0,0,0,0.1);">📧 Gmail</span>
-            {% else %}
-            <span class="chip" style="background: #fff; border: 1px solid rgba(0,0,0,0.1);">📤 Upload</span>
-            {% endif %}
-
-            <!-- Action -->
-            {% if r.attachmentId and r.messageId %}
-            <a href="{{ url_for('download', message_id=r.messageId, attachment_id=r.attachmentId, filename=r.filename) }}"
-              class="btn-pill btn-secondary"
-              style="font-size: 12px; height: 32px; padding: 0 12px; border-color: rgba(0,0,0,0.2); color: rgba(0,0,0,0.8);">
-              ⬇ PDF
-            </a>
-            {% else %}
-            <a href="{{ url_for('view_receipt', receipt_id=r.receipt_id) }}" class="btn-pill btn-secondary"
-              style="font-size: 12px; height: 32px; padding: 0 12px; border-color: rgba(0,0,0,0.2); color: rgba(0,0,0,0.8);">
-              👁 View
-            </a>
-            {% endif %}
-          </div>
+        {% endfor %}
+      {% else %}
+        <div class="rcpt-empty">
+          <div style="font-size: 48px; margin-bottom: 20px;">📂</div>
+          <h3>No receipts found</h3>
+          <p>Sync Gmail or upload receipts to see them here</p>
         </div>
+      {% endif %}
 
-      </div>
+      <!-- Bottom spacer so last card can reach center -->
+      <div class="rcpt-scroll-spacer"></div>
     </div>
-    {% endfor %}
   </div>
-  {% else %}
-  <div class="empty-state" style="text-align: center; padding: 60px; color: var(--text-muted);">
-    <div style="font-size: 48px; margin-bottom: 20px;">📂</div>
-    <h3>No receipts found</h3>
-    <p>Sync Gmail or upload receipts to see them here</p>
-  </div>
-  {% endif %}
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/transactions.js') }}"></script>
 {% endblock %}
