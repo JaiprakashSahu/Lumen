@@ -54,6 +54,7 @@ body {
     width: 100%;
     padding: 20px 80px 0;
     box-sizing: border-box;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
 /* Unified page container — every page uses this */
@@ -61,6 +62,43 @@ body {
     width: 100%;
     padding: 24px 80px 40px;
     box-sizing: border-box;
+}
+
+/* ========== PAGE HEADER ========== */
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 40px;
+    margin-bottom: 40px;
+}
+
+.page-header h1 {
+    font-size: 42px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.header-subtitle {
+    margin-top: 8px;
+    color: rgba(255,255,255,0.6);
+    font-size: 16px;
+}
+
+.header-actions .primary-btn {
+    background: linear-gradient(135deg, #8e7df5, #b8a7ff);
+    border: none;
+    padding: 12px 24px;
+    border-radius: 999px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.header-actions .primary-btn:hover {
+    transform: translateY(-2px);
 }
 
 /* ========== COMPONENT: CARDS ========== */
