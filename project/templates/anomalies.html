@@ -2,511 +2,844 @@
 {% block title %}Dashboard - Lumen{% endblock %}
 
 {% block head %}
-<!-- No local styles needed, using global style.css -->
-{% endblock %}
-
-{% block content %}
-<div class="dashboard-header" style="margin-bottom: 24px;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1 class="page-title" style="margin: 0;">Dashboard</h1>
-        <button id="refreshBtn" class="btn-primary btn-pill">
-            🔄 Refresh Data
-        </button>
-    </div>
-</div>
-
-<!-- Flash Messages -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-{% if messages %}
-<div class="flash-wrap">
-    {% for category, message in messages %}
-    <div class="flash {{ category }}">{{ message }}</div>
-    {% endfor %}
-</div>
-{% endif %}
-{% endwith %}
-
-<!-- Loading State -->
-<div id="loading" style="text-align: center; padding: 60px; color: #718096;">
-    <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
-    <div>Loading analytics...</div>
-</div>
-
-<!-- Error State -->
-<div id="error" class="flash error" style="display: none;"></div>
-
-<!-- Dashboard Content -->
-<div id="content" class="dashboard-grid" style="display: none;">
-
-    <!-- ROW 1: METRICS -->
-    <div class="metrics-row">
-        <!-- Total Debit -->
-        <div class="card card-purple">
-            <span class="card-chip">Total Debit</span>
-            <div class="metric-value" id="debitTotal">₹0</div>
-        </div>
-
-        <!-- Total Credit -->
-        <div class="card card-purple">
-            <span class="card-chip">Total Credit</span>
-            <div class="metric-value" id="creditTotal">₹0</div>
-        </div>
-
-        <!-- Net Flow -->
-        <div class="card card-purple">
-            <span class="card-chip">Net Flow</span>
-            <div class="metric-value" id="netFlow">₹0</div>
-        </div>
-
-        <!-- Transactions -->
-        <div class="card card-purple">
-            <span class="card-chip">Transactions</span>
-            <div class="metric-value" id="txnCount">0</div>
-        </div>
-    </div>
-
-    <!-- ROW 2: CHARTS -->
-    <div class="charts-row">
-        <!-- Left: Expenditure Chart (Mustard) -->
-        <div class="card card-mustard">
-            <div class="chart-header" style="display: flex; justify-content: space-between; margin-bottom: 16px;">
-                <h3>Expenditure</h3>
-                <div class="toggle-pill-container">
-                    <button class="toggle-btn active">Monthly</button>
-                    <button class="toggle-btn">Weekly</button>
-                </div>
-            </div>
-            <div class="chart-container" style="height: 300px;">
-                <canvas id="barChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Right: Expenditure Split (Sage) -->
-        <div class="card card-sage">
-            <div class="chart-header" style="margin-bottom: 16px; text-align: center;">
-                <h3>Expenditure Split</h3>
-            </div>
-            <!-- Month Selector -->
-            <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 20px;">
-                <button class="btn-secondary btn-pill"
-                    style="padding: 4px 12px; font-size: 12px; border-color: rgba(0,0,0,0.2); color: inherit;">←</button>
-                <div style="font-weight: 600; font-size: 14px;">February 2026</div>
-                <button class="btn-secondary btn-pill"
-                    style="padding: 4px 12px; font-size: 12px; border-color: rgba(0,0,0,0.2); color: inherit;">→</button>
-            </div>
-
-            <div class="donut-container">
-                <canvas id="donutChart"></canvas>
-            </div>
-            <div class="donut-legend" id="donutLegend" style="margin-top: 16px;">
-                <!-- Filled by JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- ROW 3: ALERTS & INSIGHTS -->
-    <div class="bottom-row">
-        <!-- Detected Patterns (Orange) -->
-        <div class="card card-orange">
-            <div class="chart-header">
-                <h3>Detected Pattern</h3>
-            </div>
-            <ul id="patternsList" style="margin-left: 20px; color: rgba(0,0,0,0.7); font-weight: 500;">
-                <li>Analyzing patterns...</li>
-            </ul>
-        </div>
-
-        <!-- AI Insights (Outline/Card) -->
-        <div class="card card-outline">
-            <div class="chart-header">
-                <h3
-                    style="color: var(--text-main); border: 1px solid var(--border-color); display: inline-block; padding: 4px 12px; border-radius: 20px;">
-                    AI Insight</h3>
-            </div>
-            <div id="aiSummary" style="color: var(--text-muted); line-height: 1.6; margin-top: 12px;">
-                <!-- AI content -->
-                <ul id="recommendationsList" style="list-style: none; padding: 0;">
-                    <!-- Recommendations injected here -->
-                </ul>
-            </div>
-        </div>
-
-        <!-- Upload Receipt (Hidden/Optional or integrated?) -->
-        <!-- Keeping it simple as per redesign request focusing on visual layout for dashboard -->
-        <div class="card card-outline" style="text-align: center; border-style: dashed;">
-            <h3 style="color: var(--text-muted);">Quick File Upload</h3>
-            <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: center;">
-                <input type="file" id="receiptUpload" accept=".jpg,.jpeg,.png,.pdf" style="width: auto;">
-                <button class="btn-primary btn-pill" onclick="uploadReceiptFile()">Upload</button>
-            </div>
-        </div>
-
-    </div>
-
-</div>
-
-<script>
-    // Profile Dropdown Toggle
-    function toggleProfileDropdown() {
-        const dropdown = document.getElementById('profileDropdown');
-        if (dropdown.style.display === 'none' || dropdown.style.display === '') {
-            dropdown.style.display = 'block';
-        } else {
-            dropdown.style.display = 'none';
-        }
-    }
-
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function (event) {
-        const dropdown = document.getElementById('profileDropdown');
-        const profile = document.querySelector('.sidebar-profile');
-        if (dropdown && profile && !profile.contains(event.target)) {
-            dropdown.style.display = 'none';
-        }
-    });
-
-    let currentData = null;
-    let barChartInstance = null;
-    let donutChartInstance = null;
-
-    // State for interactive features
-    let currentView = 'monthly'; // 'monthly' or 'weekly'
-    let donutMonth = new Date().getMonth() + 1; // 1-12
-    let donutYear = new Date().getFullYear();
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-
-    // Chart.js Configuration for new design
-    // Colors tuned for dark pastel theme
-    Chart.defaults.color = 'rgba(255, 255, 255, 0.6)';
-    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
-    Chart.defaults.plugins.legend.display = false;
-
-
-    async function loadAnalytics() {
-        const loading = document.getElementById('loading');
-        const error = document.getElementById('error');
-        const content = document.getElementById('content');
-
-        loading.style.display = 'block';
-        error.style.display = 'none';
-        content.style.display = 'none';
-
-        try {
-            const response = await fetch('/api/anomalies-data');
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to load analytics');
-            }
-
-            currentData = data;
-            displayAnalytics(data);
-
-            loading.style.display = 'none';
-            content.style.display = 'grid'; // Changed to grid
-
-        } catch (err) {
-            console.error('Analytics error:', err);
-            loading.style.display = 'none';
-            error.style.display = 'block';
-            error.textContent = `Error loading analytics: ${err.message}`;
-        }
-    }
-
-    function displayAnalytics(data) {
-        // Update stat cards
-        document.getElementById('debitTotal').textContent = `₹${(data.debit_total || 0).toLocaleString()}`;
-        document.getElementById('creditTotal').textContent = `₹${(data.credit_total || 0).toLocaleString()}`;
-        document.getElementById('netFlow').textContent = `₹${(data.net_flow || 0).toLocaleString()}`;
-        document.getElementById('txnCount').textContent = data.transaction_count || (data.transactions ? data.transactions.length : '0');
-
-        // Create Bar Chart
-        createBarChart(data);
-
-        // Create Donut Chart
-        createDonutChart(data);
-
-        // Display patterns
-        displayPatterns(data.patterns || []);
-
-        // Display recommendations
-        displayRecommendations(data.recommendations || [], data.ai_summary);
-
-        // Setup interactive listeners once
-        setupInteractiveFeatures();
-    }
-
-    function setupInteractiveFeatures() {
-        // 1. Monthly/Weekly Toggle for Bar Chart
-        const toggleBtns = document.querySelectorAll('.toggle-pill-container .toggle-btn');
-        toggleBtns.forEach(btn => {
-            btn.onclick = function () {
-                toggleBtns.forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                currentView = this.textContent.toLowerCase();
-                createBarChart(currentData);
-            };
-        });
-
-        // 2. Month Navigation for Donut Chart
-        const prevBtn = document.querySelector('.card-sage .btn-secondary:first-of-type');
-        const nextBtn = document.querySelector('.card-sage .btn-secondary:last-of-type');
-
-        if (prevBtn) prevBtn.onclick = () => navigateMonth(-1);
-        if (nextBtn) nextBtn.onclick = () => navigateMonth(1);
-
-        // Set initial month label for donut chart
-        const monthLabel = document.querySelector('.card-sage div[style*="font-weight: 600"]');
-        if (monthLabel) monthLabel.textContent = `${monthNames[donutMonth - 1]} ${donutYear}`;
-    }
-
-    async function navigateMonth(offset) {
-        donutMonth += offset;
-        if (donutMonth > 12) {
-            donutMonth = 1;
-            donutYear++;
-        } else if (donutMonth < 1) {
-            donutMonth = 12;
-            donutYear--;
-        }
-
-        // Update UI Label
-        const monthLabel = document.querySelector('.card-sage div[style*="font-weight: 600"]');
-        if (monthLabel) monthLabel.textContent = `${monthNames[donutMonth - 1]} ${donutYear}`;
-
-        // Show loading in donut only? For now, refresh full data for simplicity or fetch specific
-        try {
-            const response = await fetch(`/api/anomalies-data?month=${donutMonth}&year=${donutYear}`);
-            const data = await response.json();
-            if (data.success) {
-                // Update specific items
-                createDonutChart(data);
-                // We keep currentData for bar chart toggle, only update distribution parts
-                currentData.category_labels = data.category_labels;
-                currentData.category_values = data.category_values;
-            }
-        } catch (e) { console.error("Month nav error", e); }
-    }
-
-    function createBarChart(data) {
-        const ctx = document.getElementById('barChart');
-        if (!ctx) return;
-
-        if (barChartInstance) {
-            barChartInstance.destroy();
-        }
-
-        const chartConfig = currentView === 'weekly' ? data.weekly_expenditure : data.monthly_expenditure;
-
-        if (!chartConfig || !chartConfig.labels || chartConfig.labels.length === 0) {
-            // Fallback to dummy style if data missing
-            chartConfig.labels = ['-', '-', '-', '-', '-', '-'];
-            chartConfig.debit_data = [0, 0, 0, 0, 0, 0];
-            chartConfig.credit_data = [0, 0, 0, 0, 0, 0];
-        }
-
-        barChartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: chartConfig.labels,
-                datasets: [
-                    {
-                        label: 'Debit',
-                        data: chartConfig.debit_data,
-                        backgroundColor: '#000000',
-                        borderRadius: 4,
-                        barThickness: 20
-                    },
-                    {
-                        label: 'Credit',
-                        data: chartConfig.credit_data,
-                        backgroundColor: 'rgba(0,0,0,0.4)',
-                        borderRadius: 4,
-                        barThickness: 20
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: '#1a365d',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        padding: 12,
-                        cornerRadius: 8
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: 'rgba(0,0,0,0.6)', font: { size: 11 } } // Dark ticks
-                    },
-                    y: {
-                        grid: { color: 'rgba(0,0,0,0.1)' },
-                        ticks: { color: 'rgba(0,0,0,0.6)', font: { size: 11 } },
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-    }
-
-    function createDonutChart(data) {
-        const ctx = document.getElementById('donutChart');
-        if (!ctx) return;
-
-        if (donutChartInstance) {
-            donutChartInstance.destroy();
-        }
-
-        const labels = data.category_labels && data.category_labels.length > 0 ? data.category_labels : ['No Data'];
-        const values = data.category_values && data.category_values.length > 0 ? data.category_values : [100];
-
-        // Define a nice palette of neutral darks/pastels
-        const colors = ['#1a202c', '#4a5568', '#718096', '#a0aec0', '#cbd5e0', '#2d3748', '#4a5568'];
-
-        donutChartInstance = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: colors,
-                    borderWidth: 0,
-                    cutout: '70%',
-                    hoverOffset: 15
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: '#1a365d',
-                        titleColor: '#fff',
-                        callbacks: {
-                            label: function (context) {
-                                return `${context.label}: ${context.raw}%`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        // Update legend
-        const legendContainer = document.getElementById('donutLegend');
-        legendContainer.innerHTML = labels.map((label, i) => `
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 8px; transition: background 0.2s;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                     <span style="width: 10px; height: 10px; border-radius: 3px; background: ${colors[i % colors.length]}"></span>
-                     <span style="font-weight: 500;">${label}</span>
-                </div>
-                <strong style="color: #1a202c;">${values[i]}%</strong>
-            </div>
-        `).join('');
-    }
-
-    function displayPatterns(patterns) {
-        const list = document.getElementById('patternsList');
-        list.innerHTML = '';
-
-        if (patterns.length > 0) {
-            patterns.forEach(pattern => {
-                const li = document.createElement('li');
-                li.style.cssText = 'padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.1); margin-bottom: 4px;';
-                li.textContent = '• ' + pattern;
-                list.appendChild(li);
-            });
-        } else {
-            list.innerHTML = '<li>No patterns detected yet</li>';
-        }
-    }
-
-    function displayRecommendations(recommendations, summary) {
-        const list = document.getElementById('recommendationsList');
-        list.innerHTML = '';
-
-        // Add summary paragraph first if exists
-        if (summary) {
-            const p = document.createElement('p');
-            p.textContent = summary;
-            p.style.marginBottom = '12px';
-            list.appendChild(p);
-        }
-
-        if (recommendations.length > 0) {
-            recommendations.forEach(rec => {
-                const li = document.createElement('li');
-                li.style.cssText = 'padding: 8px 0; font-size: 14px; display: flex; gap: 8px;';
-                li.innerHTML = '<span style="color: var(--card-mustard);">•</span> ' + rec;
-                list.appendChild(li);
-            });
-        }
-    }
-
-    function refreshAnalytics() {
-        loadAnalytics();
-    }
-
-    function showToast(message, isError = false) {
-        const toast = document.createElement('div');
-        toast.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 16px 24px;
-            background: ${isError ? '#ef4444' : '#10b981'};
-            color: white;
-            border-radius: 8px;
-            font-weight: 600;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            z-index: 9999;
-            animation: slideIn 0.3s ease;
-        `;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 4000);
-    }
-
-    // Simple Upload
-    async function uploadReceiptFile() {
-        const input = document.getElementById('receiptUpload');
-        const file = input.files[0];
-        if (!file) { showToast('Select file', true); return; }
-
-        const formData = new FormData();
-        formData.append('file', file);
-        showToast('Uploading...');
-
-        try {
-            const r = await fetch('/upload-receipt', { method: 'POST', body: formData });
-            const d = await r.json();
-            if (d.success) showToast('Done!');
-            else showToast('Failed', true);
-        } catch (e) { showToast('Error', true); }
-    }
-
-    // Load on init
-    document.addEventListener('DOMContentLoaded', loadAnalytics);
-</script>
-
 <style>
-    @keyframes slideIn {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
+    .nav-wrapper {
+        padding: 20px 46px 0;
+        border-bottom: none;
+    }
+
+    .page-container {
+        padding: 10px 46px 34px;
+    }
+
+    .top-nav {
+        margin-bottom: 18px;
+    }
+
+    .nav-pills {
+        background: transparent;
+        border: none;
+        padding: 0;
+        gap: 14px;
+    }
+
+    .nav-item {
+        min-width: 172px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.58);
+        color: rgba(255, 255, 255, 0.74);
+        font-size: 15px;
+        font-weight: 400;
+        padding: 10px 26px;
+        line-height: 1;
+    }
+
+    .nav-item.active {
+        color: #131313;
+        background: #ececec;
+        border-color: #ececec;
+        box-shadow: none;
+    }
+
+    #syncBtn {
+        display: none !important;
+    }
+
+    .profile-btn {
+        border: 1px solid rgba(255, 255, 255, 0.58) !important;
+        color: rgba(255, 255, 255, 0.74) !important;
+        background: transparent !important;
+        padding: 10px 30px;
+        font-size: 15px;
+        font-weight: 400;
+        line-height: 1;
+        box-shadow: none !important;
+    }
+
+    .profile-btn .btn-icon {
+        display: none;
+    }
+
+    .dash-wrap {
+        display: grid;
+        gap: 22px;
+    }
+
+    .top-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 2fr;
+        gap: 18px;
+    }
+
+    .metric-grid {
+        grid-column: 1 / span 2;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+    }
+
+    .metric-card {
+        background: #b2a6c9;
+        border-radius: 24px;
+        padding: 18px 22px 12px;
+        min-height: 178px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(0, 0, 0, 0.5);
+        border-radius: 999px;
+        padding: 7px 14px;
+        font-size: 14px;
+        color: rgba(0, 0, 0, 0.88);
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .metric-value {
+        font-size: 60px;
+        color: #090909;
+        text-align: right;
+        line-height: 1;
+        font-weight: 500;
+    }
+
+    .split-card {
+        background: #c7d0c2;
+        border-radius: 24px;
+        padding: 16px 18px 14px;
+        display: grid;
+        gap: 14px;
+    }
+
+    .split-head,
+    .exp-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .toggle-pill {
+        display: inline-flex;
+        border: 1px solid rgba(0, 0, 0, 0.55);
+        border-radius: 999px;
+        padding: 2px;
+        overflow: hidden;
+    }
+
+    .toggle-pill button {
+        border: none;
+        background: transparent;
+        color: rgba(0, 0, 0, 0.75);
+        padding: 7px 20px;
+        border-radius: 999px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .toggle-pill button.active {
+        background: #0b0b0b;
+        color: #c9d2c5;
+    }
+
+    .split-body {
+        display: grid;
+        grid-template-columns: 1.35fr 1fr;
+        gap: 16px;
+        align-items: center;
+    }
+
+    .split-track {
+        min-height: 136px;
+        border-radius: 20px;
+        overflow: hidden;
+        display: flex;
+        border: 1px solid rgba(0, 0, 0, 0.16);
+        background: #202122;
+    }
+
+    .split-seg {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.74);
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .split-legend {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 6px;
+        color: rgba(0, 0, 0, 0.82);
+        font-size: 16px;
+    }
+
+    .split-legend li {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .split-foot,
+    .exp-foot {
+        border: 1px solid rgba(0, 0, 0, 0.5);
+        border-radius: 999px;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        color: rgba(0, 0, 0, 0.86);
+        font-size: 16px;
+    }
+
+    .arrow-btn {
+        border: none;
+        background: transparent;
+        color: inherit;
+        font-size: 20px;
+        cursor: pointer;
+        line-height: 1;
+    }
+
+    .arrow-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    .mid-row {
+        display: grid;
+        grid-template-columns: 3fr 1fr;
+        gap: 18px;
+    }
+
+    .exp-card {
+        background: #989002;
+        border-radius: 24px;
+        padding: 18px;
+        display: grid;
+        gap: 12px;
+    }
+
+    .exp-chart-box {
+        height: 350px;
+        position: relative;
+    }
+
+    .dataset-pills {
+        display: inline-flex;
+        gap: 12px;
+    }
+
+    .dataset-pill {
+        min-width: 98px;
+        border-radius: 999px;
+        border: 1px solid rgba(0, 0, 0, 0.6);
+        background: rgba(0, 0, 0, 0.2);
+        color: rgba(0, 0, 0, 0.7);
+        padding: 8px 14px;
+        font-size: 13px;
+        cursor: pointer;
+    }
+
+    .dataset-pill.active {
+        background: #141414;
+        color: #bcb400;
+    }
+
+    .pattern-card {
+        background: #ff5630;
+        border-radius: 24px;
+        padding: 18px 18px 14px;
+        display: grid;
+        align-content: start;
+        gap: 14px;
+        color: #120f10;
+    }
+
+    .pattern-list {
+        margin: 0;
+        padding-left: 28px;
+        font-size: 16px;
+        line-height: 1.4;
+    }
+
+    .insight-card {
+        margin-top: 2px;
+        color: #d4d4d4;
+    }
+
+    .insight-chip {
+        border-color: rgba(255, 255, 255, 0.55);
+        color: rgba(255, 255, 255, 0.8);
+        margin-bottom: 14px;
+    }
+
+    .insight-summary {
+        color: rgba(180, 180, 180, 0.72);
+        font-size: 14px;
+        margin-bottom: 12px;
+    }
+
+    .insight-list {
+        margin: 0;
+        padding-left: 28px;
+        font-size: 18px;
+        line-height: 1.38;
+        color: #efefef;
+    }
+
+    .loading,
+    .error-box {
+        margin-top: 40px;
+        text-align: center;
+        color: #8f8f8f;
+        font-size: 14px;
+    }
+
+    .refresh-inline {
+        border: 1px solid rgba(255, 255, 255, 0.45);
+        color: rgba(255, 255, 255, 0.78);
+        background: transparent;
+        border-radius: 999px;
+        padding: 8px 18px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    @media (max-width: 1200px) {
+        .page-container {
+            padding: 10px 18px 30px;
         }
 
-        to {
-            transform: translateX(0);
-            opacity: 1;
+        .top-row {
+            grid-template-columns: 1fr;
+        }
+
+        .metric-grid,
+        .mid-row {
+            grid-template-columns: 1fr;
+        }
+
+        .split-body {
+            grid-template-columns: 1fr;
+        }
+
+        .nav-item,
+        .profile-btn,
+        .chip,
+        .metric-value,
+        .toggle-pill button,
+        .split-legend,
+        .split-foot,
+        .exp-foot,
+        .pattern-list,
+        .insight-summary,
+        .insight-list,
+        .dataset-pill,
+        .refresh-inline {
+            font-size: clamp(14px, 2.4vw, 20px);
+        }
+
+        .exp-chart-box {
+            height: 260px;
         }
     }
 </style>
+{% endblock %}
+
+{% block content %}
+<div id="dashLoading" class="loading">Loading dashboard...</div>
+<div id="dashError" class="error-box" style="display:none;"></div>
+
+<section id="dashWrap" class="dash-wrap" style="display:none;">
+    <div style="display:flex; justify-content:flex-end;">
+        <button id="refreshBtn" class="refresh-inline" type="button">Refresh Data</button>
+    </div>
+
+    <div class="top-row">
+        <div class="metric-grid">
+            <article class="metric-card">
+                <span class="chip">Total Debit</span>
+                <strong class="metric-value" id="debitTotal">-₹0</strong>
+            </article>
+            <article class="metric-card">
+                <span class="chip">Total Credit</span>
+                <strong class="metric-value" id="creditTotal">+₹0</strong>
+            </article>
+            <article class="metric-card">
+                <span class="chip">Net Flow</span>
+                <strong class="metric-value" id="netFlow">₹0</strong>
+            </article>
+            <article class="metric-card">
+                <span class="chip">Transactions</span>
+                <strong class="metric-value" id="txnCount">0</strong>
+            </article>
+        </div>
+
+        <article class="split-card">
+            <div class="split-head">
+                <span class="chip">Expenditure Split</span>
+                <div class="toggle-pill">
+                    <button id="splitMonthlyBtn" class="active" type="button">Monthly</button>
+                    <button id="splitWeeklyBtn" type="button">Weekly</button>
+                </div>
+            </div>
+
+            <div class="split-body">
+                <div class="split-track" id="splitTrack"></div>
+                <ul class="split-legend" id="splitLegend"></ul>
+            </div>
+
+            <div class="split-foot">
+                <button id="splitPrevBtn" class="arrow-btn" type="button">←</button>
+                <span id="splitLabel">-</span>
+                <button id="splitNextBtn" class="arrow-btn" type="button">→</button>
+            </div>
+        </article>
+    </div>
+
+    <div class="mid-row">
+        <article class="exp-card">
+            <div class="exp-head">
+                <span class="chip">Expenditure</span>
+                <div class="toggle-pill">
+                    <button id="expMonthlyBtn" class="active" type="button">Monthly</button>
+                    <button id="expWeeklyBtn" type="button">Weekly</button>
+                </div>
+            </div>
+
+            <div class="exp-chart-box">
+                <canvas id="expChart"></canvas>
+            </div>
+
+            <div class="exp-foot">
+                <button id="expPrevBtn" class="arrow-btn" type="button">← Previous</button>
+                <div class="dataset-pills">
+                    <button id="toggleCreditBtn" class="dataset-pill active" type="button">Credit</button>
+                    <button id="toggleDebitBtn" class="dataset-pill active" type="button">Debit</button>
+                </div>
+                <button id="expNextBtn" class="arrow-btn" type="button">Next →</button>
+            </div>
+        </article>
+
+        <article class="pattern-card">
+            <span class="chip">Detected Pattern</span>
+            <ul id="patternList" class="pattern-list"></ul>
+        </article>
+    </div>
+
+    <article class="insight-card">
+        <span class="chip insight-chip">AI Insight</span>
+        <p id="aiSummary" class="insight-summary">AI insights are recommendation based on your expenditure pattern.</p>
+        <ul id="recommendationList" class="insight-list"></ul>
+    </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const segColors = ['#1f2021', '#4e514f', '#707670', '#969d97', '#bdc2be'];
+
+        let rawData = null;
+        let splitMonthlyData = null;
+        let splitMode = 'monthly';
+        let splitMonth = new Date().getMonth() + 1;
+        let splitYear = new Date().getFullYear();
+        let splitWeekOffset = 0;
+
+        let expMode = 'monthly';
+        let expOffset = 0;
+        const expWindow = 5;
+        let showCredit = true;
+        let showDebit = true;
+        let expChart = null;
+
+        const el = {
+            dashLoading: document.getElementById('dashLoading'),
+            dashError: document.getElementById('dashError'),
+            dashWrap: document.getElementById('dashWrap'),
+            refreshBtn: document.getElementById('refreshBtn'),
+            debitTotal: document.getElementById('debitTotal'),
+            creditTotal: document.getElementById('creditTotal'),
+            netFlow: document.getElementById('netFlow'),
+            txnCount: document.getElementById('txnCount'),
+            splitMonthlyBtn: document.getElementById('splitMonthlyBtn'),
+            splitWeeklyBtn: document.getElementById('splitWeeklyBtn'),
+            splitPrevBtn: document.getElementById('splitPrevBtn'),
+            splitNextBtn: document.getElementById('splitNextBtn'),
+            splitLabel: document.getElementById('splitLabel'),
+            splitTrack: document.getElementById('splitTrack'),
+            splitLegend: document.getElementById('splitLegend'),
+            expMonthlyBtn: document.getElementById('expMonthlyBtn'),
+            expWeeklyBtn: document.getElementById('expWeeklyBtn'),
+            expPrevBtn: document.getElementById('expPrevBtn'),
+            expNextBtn: document.getElementById('expNextBtn'),
+            toggleCreditBtn: document.getElementById('toggleCreditBtn'),
+            toggleDebitBtn: document.getElementById('toggleDebitBtn'),
+            expChart: document.getElementById('expChart'),
+            patternList: document.getElementById('patternList'),
+            aiSummary: document.getElementById('aiSummary'),
+            recommendationList: document.getElementById('recommendationList')
+        };
+
+        function formatAmount(value, showSign = false) {
+            const num = Number(value || 0);
+            const abs = Math.round(Math.abs(num)).toLocaleString();
+            if (!showSign) {
+                return '₹' + (num < 0 ? '-' : '') + abs;
+            }
+            return (num >= 0 ? '+₹' : '-₹') + abs;
+        }
+
+        function setActive(btn, state) {
+            if (state) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        }
+
+        async function fetchAnalytics(month, year) {
+            let url = '/api/anomalies-data';
+            if (month && year) {
+                url += '?month=' + month + '&year=' + year;
+            }
+            const res = await fetch(url);
+            const json = await res.json();
+            if (!json.success) {
+                throw new Error(json.error || 'Failed to load dashboard data');
+            }
+            return json;
+        }
+
+        async function fetchTxnCount() {
+            try {
+                const res = await fetch('/api/transactions/all');
+                const json = await res.json();
+                if (json.success) {
+                    return Number(json.count || 0);
+                }
+            } catch (e) {
+                console.error('Transaction count error', e);
+            }
+            return 0;
+        }
+
+        function renderMetrics(data, txnCount) {
+            el.debitTotal.textContent = formatAmount(-Math.abs(data.debit_total || 0), true);
+            el.creditTotal.textContent = formatAmount(Math.abs(data.credit_total || 0), true);
+            el.netFlow.textContent = formatAmount(data.net_flow || 0);
+            el.txnCount.textContent = String(txnCount);
+        }
+
+        function renderPatterns(patterns) {
+            const usable = (patterns || []).slice(0, 4);
+            if (!usable.length) {
+                el.patternList.innerHTML = '<li>No pattern detected yet.</li>';
+                return;
+            }
+            el.patternList.innerHTML = usable.map(function (p) {
+                return '<li>' + p + '</li>';
+            }).join('');
+        }
+
+        function renderInsights(summary, recs) {
+            el.aiSummary.textContent = summary || 'AI insights are recommendation based on your expenditure pattern.';
+            const items = (recs || []).slice(0, 5);
+            if (!items.length) {
+                el.recommendationList.innerHTML = '<li>No recommendations available yet.</li>';
+                return;
+            }
+            el.recommendationList.innerHTML = items.map(function (r) { return '<li>' + r + '</li>'; }).join('');
+        }
+
+        function getExpSeries() {
+            const src = expMode === 'weekly' ? rawData.weekly_expenditure : rawData.monthly_expenditure;
+            const labels = (src && src.labels) ? src.labels.slice() : [];
+            const debit = (src && src.debit_data) ? src.debit_data.slice() : [];
+            const credit = (src && src.credit_data) ? src.credit_data.slice() : [];
+
+            const rows = labels.map(function (label, i) {
+                return {
+                    label: label,
+                    debit: Number(debit[i] || 0),
+                    credit: Number(credit[i] || 0)
+                };
+            });
+
+            if (!rows.length) {
+                rows.push({ label: 'No Data', debit: 0, credit: 0 });
+            }
+
+            return rows;
+        }
+
+        function renderExpenditureChart() {
+            const rows = getExpSeries();
+            const maxOffset = Math.max(0, rows.length - expWindow);
+            expOffset = Math.max(0, Math.min(expOffset, maxOffset));
+            const view = rows.slice(expOffset, expOffset + expWindow);
+
+            if (expChart) {
+                expChart.destroy();
+            }
+
+            expChart = new Chart(el.expChart, {
+                type: 'bar',
+                data: {
+                    labels: view.map(function (r) { return r.label; }),
+                    datasets: [
+                        {
+                            label: 'Credit',
+                            data: view.map(function (r) { return r.credit; }),
+                            backgroundColor: '#060606',
+                            borderRadius: 0,
+                            hidden: !showCredit,
+                            barThickness: 38
+                        },
+                        {
+                            label: 'Debit',
+                            data: view.map(function (r) { return r.debit; }),
+                            backgroundColor: '#544f00',
+                            borderRadius: 0,
+                            hidden: !showDebit,
+                            barThickness: 38
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 280 },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#111',
+                            titleColor: '#fff',
+                            bodyColor: '#fff'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: 'rgba(0,0,0,0.88)', font: { size: 12 } }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.35)' },
+                            ticks: { color: 'rgba(0,0,0,0.82)', font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+
+            el.expPrevBtn.disabled = expOffset <= 0;
+            el.expNextBtn.disabled = expOffset >= maxOffset;
+        }
+
+        function getWeeklySplitRows() {
+            const weekly = rawData.weekly_expenditure || { labels: [], debit_data: [] };
+            const labels = weekly.labels || [];
+            const values = weekly.debit_data || [];
+            const rows = labels.map(function (label, i) {
+                return { label: label, value: Number(values[i] || 0) };
+            }).filter(function (row) { return row.value >= 0; });
+
+            if (!rows.length) {
+                return [{ label: 'No Data', value: 1 }];
+            }
+            return rows;
+        }
+
+        function renderSplitRows(rows, labelText, valueSuffix) {
+            const total = rows.reduce(function (sum, row) { return sum + row.value; }, 0) || 1;
+
+            el.splitTrack.innerHTML = rows.map(function (row, i) {
+                const pct = Math.max(8, Math.round((row.value / total) * 100));
+                const text = Math.round((row.value / total) * 100) + '%';
+                return '<div class="split-seg" style="flex:' + pct + '; background:' + segColors[i % segColors.length] + ';">' + text + '</div>';
+            }).join('');
+
+            el.splitLegend.innerHTML = rows.map(function (row, i) {
+                const shown = valueSuffix === '%' ? Math.round(row.value) + '%' : '₹' + Math.round(row.value).toLocaleString();
+                const color = i === rows.length - 1 ? ' style="opacity:.45;"' : '';
+                return '<li' + color + '><span>' + row.label + ':</span><strong>' + shown + '</strong></li>';
+            }).join('');
+
+            el.splitLabel.textContent = labelText;
+        }
+
+        async function renderSplitMonthly() {
+            if (!splitMonthlyData) {
+                splitMonthlyData = await fetchAnalytics(splitMonth, splitYear);
+            }
+            const labels = splitMonthlyData.category_labels || [];
+            const values = splitMonthlyData.category_values || [];
+
+            const rows = labels.map(function (label, i) {
+                return { label: label, value: Number(values[i] || 0) };
+            });
+
+            if (!rows.length) {
+                rows.push({ label: 'No Data', value: 100 });
+            }
+
+            renderSplitRows(rows, monthNames[splitMonth - 1] + ' ' + splitYear, '%');
+            el.splitPrevBtn.disabled = false;
+            el.splitNextBtn.disabled = false;
+        }
+
+        function renderSplitWeekly() {
+            const rows = getWeeklySplitRows();
+            const perPage = 4;
+            const maxOffset = Math.max(0, rows.length - perPage);
+            splitWeekOffset = Math.max(0, Math.min(splitWeekOffset, maxOffset));
+            const view = rows.slice(splitWeekOffset, splitWeekOffset + perPage);
+
+            renderSplitRows(view, 'Last Weeks', '₹');
+            el.splitPrevBtn.disabled = splitWeekOffset <= 0;
+            el.splitNextBtn.disabled = splitWeekOffset >= maxOffset;
+        }
+
+        async function renderSplitCard() {
+            if (splitMode === 'monthly') {
+                await renderSplitMonthly();
+            } else {
+                renderSplitWeekly();
+            }
+        }
+
+        function bindEvents() {
+            el.refreshBtn.addEventListener('click', initDashboard);
+
+            el.expMonthlyBtn.addEventListener('click', function () {
+                expMode = 'monthly';
+                expOffset = 0;
+                setActive(el.expMonthlyBtn, true);
+                setActive(el.expWeeklyBtn, false);
+                renderExpenditureChart();
+            });
+
+            el.expWeeklyBtn.addEventListener('click', function () {
+                expMode = 'weekly';
+                expOffset = 0;
+                setActive(el.expMonthlyBtn, false);
+                setActive(el.expWeeklyBtn, true);
+                renderExpenditureChart();
+            });
+
+            el.expPrevBtn.addEventListener('click', function () {
+                expOffset = Math.max(0, expOffset - 1);
+                renderExpenditureChart();
+            });
+
+            el.expNextBtn.addEventListener('click', function () {
+                expOffset += 1;
+                renderExpenditureChart();
+            });
+
+            el.toggleCreditBtn.addEventListener('click', function () {
+                showCredit = !showCredit;
+                setActive(el.toggleCreditBtn, showCredit);
+                renderExpenditureChart();
+            });
+
+            el.toggleDebitBtn.addEventListener('click', function () {
+                showDebit = !showDebit;
+                setActive(el.toggleDebitBtn, showDebit);
+                renderExpenditureChart();
+            });
+
+            el.splitMonthlyBtn.addEventListener('click', async function () {
+                splitMode = 'monthly';
+                setActive(el.splitMonthlyBtn, true);
+                setActive(el.splitWeeklyBtn, false);
+                await renderSplitCard();
+            });
+
+            el.splitWeeklyBtn.addEventListener('click', async function () {
+                splitMode = 'weekly';
+                splitWeekOffset = 0;
+                setActive(el.splitMonthlyBtn, false);
+                setActive(el.splitWeeklyBtn, true);
+                await renderSplitCard();
+            });
+
+            el.splitPrevBtn.addEventListener('click', async function () {
+                if (splitMode === 'monthly') {
+                    splitMonth -= 1;
+                    if (splitMonth < 1) {
+                        splitMonth = 12;
+                        splitYear -= 1;
+                    }
+                    splitMonthlyData = null;
+                    await renderSplitCard();
+                    return;
+                }
+
+                splitWeekOffset = Math.max(0, splitWeekOffset - 1);
+                await renderSplitCard();
+            });
+
+            el.splitNextBtn.addEventListener('click', async function () {
+                if (splitMode === 'monthly') {
+                    splitMonth += 1;
+                    if (splitMonth > 12) {
+                        splitMonth = 1;
+                        splitYear += 1;
+                    }
+                    splitMonthlyData = null;
+                    await renderSplitCard();
+                    return;
+                }
+
+                splitWeekOffset += 1;
+                await renderSplitCard();
+            });
+        }
+
+        async function initDashboard() {
+            el.dashLoading.style.display = 'block';
+            el.dashError.style.display = 'none';
+            el.dashWrap.style.display = 'none';
+
+            try {
+                const results = await Promise.all([fetchAnalytics(), fetchTxnCount()]);
+                rawData = results[0];
+                const txnCount = results[1];
+
+                splitMonthlyData = await fetchAnalytics(splitMonth, splitYear).catch(function () { return rawData; });
+
+                renderMetrics(rawData, txnCount);
+                renderPatterns(rawData.patterns || []);
+                renderInsights(rawData.ai_summary, rawData.recommendations || []);
+                renderExpenditureChart();
+                await renderSplitCard();
+
+                el.dashLoading.style.display = 'none';
+                el.dashWrap.style.display = 'grid';
+            } catch (err) {
+                console.error(err);
+                el.dashLoading.style.display = 'none';
+                el.dashError.style.display = 'block';
+                el.dashError.textContent = 'Failed to load dashboard: ' + err.message;
+            }
+        }
+
+        bindEvents();
+        initDashboard();
+    })();
+</script>
 {% endblock %}
