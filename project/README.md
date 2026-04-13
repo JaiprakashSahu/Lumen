@@ -124,13 +124,13 @@ project/
 
 ```bash
 git clone https://github.com/yourusername/project-lumen.git
-cd project-lumen/project
+cd project-lumen
 ```
 
 ### 2. Install Dependencies
 
 ```bash
-# Make sure you're in the 'project' directory
+# Enter the app directory
 cd project
 
 pip install -r requirements.txt
@@ -175,6 +175,45 @@ python app.py
 ```
 
 The application will be available at `http://localhost:5000`
+
+---
+
+## 🚢 Deployment (Production)
+
+### 1. Configure Production Environment
+
+Use `project/.env.example` as reference and set at minimum:
+
+```env
+APP_ENV=production
+FLASK_DEBUG=0
+FLASK_SECRET_KEY=replace_with_long_random_value
+GOOGLE_CLIENT_SECRET_FILE=client_secret.json
+PORT=5000
+```
+
+### 2. Install Production Dependencies
+
+```bash
+cd project
+pip install -r requirements.txt
+```
+
+### 3. Run with Gunicorn
+
+```bash
+gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120 wsgi:app
+```
+
+The project includes `wsgi.py` and a `Procfile` for platform deployment.
+
+### 4. Health Check Endpoint
+
+Use this endpoint for load balancer/container health checks:
+
+```text
+GET /healthz
+```
 
 ---
 

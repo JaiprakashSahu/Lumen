@@ -1,5 +1,4 @@
 import os
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 import base64
 from flask import Flask, redirect, url_for, session, render_template, request, send_file, flash, jsonify
@@ -8,8 +7,10 @@ from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 from dotenv import load_dotenv
 from io import BytesIO
+from datetime import timedelta
 import re
 import json
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Import ONE database instance
 from modules.database.db import db
@@ -34,8 +35,32 @@ from modules.mcp.server import mcp_server
 
 load_dotenv()
 
+APP_ENV = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "development")).lower()
+IS_PRODUCTION = APP_ENV == "production"
+
+# Allow OAuth callbacks over HTTP only for local development.
+if not IS_PRODUCTION and os.getenv("OAUTHLIB_INSECURE_TRANSPORT") is None:
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+flask_secret_key = os.getenv("FLASK_SECRET_KEY")
+if IS_PRODUCTION and not flask_secret_key:
+    raise RuntimeError("FLASK_SECRET_KEY is required when APP_ENV=production")
+if not flask_secret_key:
+    flask_secret_key = "dev-only-change-me"
+app.secret_key = flask_secret_key
+
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE=os.getenv("SESSION_COOKIE_SAMESITE", "Lax"),
+    SESSION_COOKIE_SECURE=IS_PRODUCTION,
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=int(os.getenv("SESSION_LIFETIME_HOURS", "12"))),
+)
+
+# Trust one reverse proxy hop in production-style deployments.
+if os.getenv("TRUST_PROXY", "1") == "1":
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 # Configure SQLite database with ABSOLUTE PATH
 # This prevents Flask from creating it in the instance/ folder
@@ -1290,6 +1315,23 @@ def logout():
     return redirect(url_for("index"))
 
 
+# ---------------------- HEALTH CHECK ----------------------
+@app.route("/healthz")
+def healthz():
+    db_exists = os.path.exists(db_path)
+    status = 200 if db_exists else 503
+    return jsonify({
+        "status": "ok" if db_exists else "degraded",
+        "environment": APP_ENV,
+        "database_file": db_path,
+        "database_available": db_exists
+    }), status
+
+
 # ---------------------- RUN ----------------------
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    app.run(
+        host=os.getenv("FLASK_HOST", "0.0.0.0"),
+        port=int(os.getenv("PORT", "5000")),
+        debug=os.getenv("FLASK_DEBUG", "0") == "1"
+    )
