@@ -5,6 +5,19 @@
 {% endblock %}
 
 {% block content %}
+<div class="page-header">
+    <div class="header-left">
+        <h1>Dashboard</h1>
+        <p class="header-subtitle">Overview of your financial activity</p>
+    </div>
+    <div class="header-actions">
+        <button class="action-btn refresh-btn" id="refreshBtn">
+            <span class="btn-icon">🔄</span>
+            <span>Refresh Data</span>
+        </button>
+    </div>
+</div>
+
 <div class="dashboard-grid">
   <!-- Row 1: Metrics -->
   <div class="metrics-row">

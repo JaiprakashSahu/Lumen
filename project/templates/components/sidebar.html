@@ -23,14 +23,16 @@
     </div>
 
     <div class="nav-right" style="display: flex; gap: 12px; align-items: center;">
-        <a href="{{ url_for('sync_gmail') }}" class="btn-secondary btn-pill" title="Sync Gmail">
-            🔄 Sync
+        <a href="{{ url_for('sync_gmail') }}" class="action-btn sync-btn" id="syncBtn">
+            <span class="btn-icon">🔄</span>
+            <span>Sync</span>
         </a>
 
         <!-- Profile Button -->
         <div class="profile-wrapper" style="position: relative;">
-            <button onclick="toggleProfileDropdown()" class="profile-btn">
-                Profile
+            <button onclick="toggleProfileDropdown()" class="action-btn profile-btn">
+                <span class="btn-icon">👤</span>
+                <span>Profile</span>
             </button>
 
             <!-- Dropdown -->

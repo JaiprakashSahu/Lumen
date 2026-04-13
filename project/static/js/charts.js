@@ -59,6 +59,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Refresh button handler — always goes through renderDonutChart()
     document.getElementById("refreshBtn")?.addEventListener("click", function () {
+        this.classList.add("loading");
+
+        const btn = this;
         const newData = {
             labels: ["Shopping", "Food", "Other"],
             datasets: [{
@@ -68,5 +71,19 @@ document.addEventListener("DOMContentLoaded", function () {
         };
 
         renderDonutChart(newData);
+
+        setTimeout(() => {
+            btn.classList.remove("loading");
+        }, 1500);
+    });
+
+    // Sync button loading animation
+    document.getElementById("syncBtn")?.addEventListener("click", function () {
+        this.classList.add("loading");
+
+        const btn = this;
+        setTimeout(() => {
+            btn.classList.remove("loading");
+        }, 2000);
     });
 });

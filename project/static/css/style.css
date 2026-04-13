@@ -86,19 +86,91 @@ body {
     font-size: 16px;
 }
 
-.header-actions .primary-btn {
-    background: linear-gradient(135deg, #8e7df5, #b8a7ff);
-    border: none;
+/* ===============================
+   PREMIUM ACTION BUTTONS
+================================ */
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
     padding: 12px 24px;
     border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.15);
     color: white;
     font-weight: 600;
     cursor: pointer;
-    transition: transform 0.2s ease;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    font-size: 14px;
 }
 
-.header-actions .primary-btn:hover {
-    transform: translateY(-2px);
+/* Soft gradient glow */
+.action-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(142,125,245,0.4), rgba(99,102,241,0.4));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 0;
+}
+
+.action-btn span {
+    position: relative;
+    z-index: 2;
+}
+
+/* Hover effect */
+.action-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px rgba(142,125,245,0.4);
+}
+
+.action-btn:hover::before {
+    opacity: 1;
+}
+
+/* Click effect */
+.action-btn:active {
+    transform: scale(0.96);
+}
+
+/* Icon animation */
+.btn-icon {
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.action-btn:hover .btn-icon {
+    transform: rotate(15deg);
+}
+
+/* Loading state */
+.action-btn.loading .btn-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Different accent styles */
+.sync-btn:hover {
+    box-shadow: 0 10px 25px rgba(0,150,255,0.4);
+}
+
+.refresh-btn:hover {
+    box-shadow: 0 10px 25px rgba(142,125,245,0.5);
+}
+
+.profile-btn:hover {
+    box-shadow: 0 10px 25px rgba(255,255,255,0.2);
 }
 
 /* ========== COMPONENT: CARDS ========== */
