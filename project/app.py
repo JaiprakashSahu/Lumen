@@ -123,7 +123,7 @@ repo = TransactionRepository()
 @app.route("/")
 def index():
     # Show landing page for unauthenticated users
-    if "credentials" in session:
+    if "credentials" in session or session.get("guest_access"):
         return redirect(url_for("dashboard_analytics"))
     else:
         return render_template("landing.html")
@@ -133,7 +133,7 @@ def index():
 @app.route("/login")
 def login_page():
     """Alternative login page route"""
-    if "credentials" in session:
+    if "credentials" in session or session.get("guest_access"):
         return redirect(url_for("dashboard_analytics"))
     else:
         return render_template("login.html")
@@ -142,6 +142,13 @@ def login_page():
 def login_with_google():
     """Route for the Google login button"""
     return redirect(url_for("auth_google"))
+
+
+@app.route("/mcp/skip")
+def mcp_skip():
+    """Allow user to skip MCP phone setup and continue to dashboard."""
+    session["guest_access"] = True
+    return redirect(url_for("dashboard_analytics"))
 
 
 # ---------------------- GOOGLE LOGIN ----------------------
@@ -193,10 +200,10 @@ def oauth2callback():
                 flow.fetch_token(authorization_response=request.url)
             except:
                 flash("Authentication failed. Please check your Google Cloud Console setup.", "error")
-                return redirect(url_for("landing"))
+                return redirect(url_for("index"))
         else:
             flash(f"Authentication failed: {str(e)}", "error")
-            return redirect(url_for("landing"))
+            return redirect(url_for("index"))
 
     creds = flow.credentials
 
@@ -580,7 +587,7 @@ def get_all_transactions():
 @app.route("/dashboard-analytics")
 def dashboard_analytics():
     """Dashboard - Anomalies and Analytics page"""
-    if "credentials" not in session:
+    if "credentials" not in session and not session.get("guest_access"):
         return redirect(url_for("index"))
     
     return render_template("anomalies.html")
