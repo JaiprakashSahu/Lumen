@@ -2,87 +2,79 @@
 {% block title %}Wishlist & Smart Advisor - Lumen{% endblock %}
 
 {% block content %}
-<div class="wl-page">
+<div class="wl2-page">
+  <p class="wl2-intro">You can add an item which you wish to purchase but did not want to imbalance your financial stability. This will tell you a projection of when you are going to be able to have it.</p>
 
-  <!-- Header & Stats -->
-  <div class="wl-header">
-    <div>
-      <h2 class="wl-header__title">Values & Wishlist</h2>
-      <p class="wl-header__sub">AI-powered purchase advice</p>
-    </div>
-    <div class="wl-header__badge">
-      <span>🎁</span>
-      <span>{{ wishlist_count }} Items</span>
-    </div>
-  </div>
-
-  <!-- Add New Item Form -->
-  <div class="wl-form">
-    <h3 class="wl-form__title">+ Add New Wish</h3>
-    <form id="addItemForm" onsubmit="addWishlistItem(event)" class="wl-form__fields">
-
-      <div class="wl-form__group wl-form__group--wide">
-        <label class="wl-form__label">ITEM NAME</label>
-        <input type="text" id="itemName" name="item_name" required placeholder="e.g. iPad Air"
-          class="wl-form__input">
-      </div>
-
-      <div class="wl-form__group">
-        <label class="wl-form__label">PRICE (₹)</label>
-        <input type="number" id="expectedPrice" name="expected_price" required placeholder="50000"
-          class="wl-form__input">
-      </div>
-
-      <div class="wl-form__group wl-form__group--wide">
-        <label class="wl-form__label">NOTES</label>
-        <input type="text" id="notes" name="notes" placeholder="Optional notes..."
-          class="wl-form__input">
-      </div>
-
-      <button type="submit" class="wl-form__submit">Add Item</button>
-    </form>
-  </div>
-
-  <!-- Wishlist Grid -->
   {% if wishlist_items %}
-  <div class="wl-grid">
-    {% for item in wishlist_items %}
-    <div class="wl-card" data-id="{{ item.wishlist_id }}">
+    {% set featured = wishlist_items[0] %}
+    <section class="wl2-feature-card" data-id="{{ featured.wishlist_id }}">
+      <div class="wl2-feature-left">
+        <h2 class="wl2-feature-title">{{ featured.item_name }}</h2>
+        <p class="wl2-feature-projection">Projection: {{ (featured.expected_price / 3125)|round(0, 'ceil')|int }} months</p>
+        <p class="wl2-feature-note">{{ featured.notes or 'Plan this purchase with confidence using AI recommendation and spending trend data.' }}</p>
+      </div>
 
-      <div class="wl-card__top">
-        <div>
-          <h4 class="wl-card__name">{{ item.item_name }}</h4>
-          <span class="wl-card__category">{{ item.category }}</span>
+      <div class="wl2-feature-right">
+        <div class="wl2-feature-price">₹{{ "{:,.0f}".format(featured.expected_price) }}</div>
+        <div class="wl2-feature-actions">
+          <button onclick="getAIAdvice('{{ featured.wishlist_id }}')" class="wl2-chip-btn" type="button">AI Advice</button>
+          <button onclick="deleteWishlistItem('{{ featured.wishlist_id }}')" class="wl2-chip-btn wl2-chip-btn--danger" type="button">Delete</button>
         </div>
-        <div class="wl-card__price">₹{{ "{:,.0f}".format(item.expected_price) }}</div>
       </div>
-
-      {% if item.notes %}
-      <div class="wl-card__notes">
-        {{ item.notes }}
-      </div>
-      {% endif %}
-
-      <div class="wl-card__actions">
-        <button onclick="getAIAdvice('{{ item.wishlist_id }}')" class="wl-btn-ai">
-          💡 AI Advice
-        </button>
-        <button onclick="deleteWishlistItem('{{ item.wishlist_id }}')" class="wl-btn-delete" title="Remove">
-          🗑
-        </button>
-      </div>
-
-    </div>
-    {% endfor %}
-  </div>
+    </section>
   {% else %}
-  <div class="wl-empty">
-    <div class="wl-empty__icon">🎁</div>
-    <h3>Wishlist is empty</h3>
-    <p>Add items to see AI recommendations</p>
-  </div>
+    <section class="wl2-feature-card wl2-feature-card--empty">
+      <div class="wl2-feature-left">
+        <h2 class="wl2-feature-title">Your Dream Purchase</h2>
+        <p class="wl2-feature-projection">Projection: add an item first</p>
+        <p class="wl2-feature-note">Start by entering an item and expected amount below.</p>
+      </div>
+      <div class="wl2-feature-right">
+        <div class="wl2-feature-price">₹0</div>
+      </div>
+    </section>
   {% endif %}
 
+  <section class="wl2-form-shell wl2-form-shell--hidden" id="wl2FormShell" aria-hidden="true">
+    <form id="addItemForm" onsubmit="addWishlistItem(event)" class="wl2-form-grid">
+      <div class="wl2-form-col wl2-form-col--left">
+        <input type="text" id="itemName" name="item_name" required placeholder="Name of the item" class="wl2-input wl2-input--title">
+        <textarea id="notes" name="notes" placeholder="Add note (optional)" class="wl2-input wl2-textarea"></textarea>
+      </div>
+
+      <div class="wl2-form-col wl2-form-col--right">
+        <input type="number" id="expectedPrice" name="expected_price" required placeholder="Enter expected amount" class="wl2-input wl2-input--amount">
+
+        <div class="wl2-form-actions">
+          <button type="submit" class="wl2-outline-btn">Done</button>
+          <button type="button" id="wl2CancelBtn" class="wl2-outline-btn">Cancel</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  {% if wishlist_items|length > 1 %}
+  <section class="wl2-extra-list">
+    {% for item in wishlist_items[1:] %}
+    <article class="wl2-item-row" data-id="{{ item.wishlist_id }}">
+      <div class="wl2-item-main">
+        <div class="wl2-item-name">{{ item.item_name }}</div>
+        <div class="wl2-item-meta">{{ item.category }}{% if item.notes %} · {{ item.notes[:60] }}{% endif %}</div>
+      </div>
+      <div class="wl2-item-right">
+        <span class="wl2-item-price">₹{{ "{:,.0f}".format(item.expected_price) }}</span>
+        <button onclick="getAIAdvice('{{ item.wishlist_id }}')" class="wl2-mini-btn" type="button">AI</button>
+        <button onclick="deleteWishlistItem('{{ item.wishlist_id }}')" class="wl2-mini-btn wl2-mini-btn--danger" type="button">Del</button>
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <button id="wl2AddMoreBtn" class="wl2-add-more" type="button">
+    <span class="wl2-add-more__label">{% if wishlist_items %}Add another DREAM thing{% else %}Add your first DREAM thing{% endif %}</span>
+    <span class="wl2-add-more__icon">＋</span>
+  </button>
 </div>
 
 
@@ -150,25 +142,6 @@
 
 {% block scripts %}
 <script>
-  // Profile Dropdown Toggle
-  function toggleProfileDropdown() {
-    const dropdown = document.getElementById('profileDropdown');
-    if (dropdown.style.display === 'none' || dropdown.style.display === '') {
-      dropdown.style.display = 'block';
-    } else {
-      dropdown.style.display = 'none';
-    }
-  }
-
-  // Close dropdown when clicking outside
-  document.addEventListener('click', function (event) {
-    const dropdown = document.getElementById('profileDropdown');
-    const profile = document.querySelector('.sidebar-profile');
-    if (dropdown && profile && !profile.contains(event.target)) {
-      dropdown.style.display = 'none';
-    }
-  });
-
   // Add wishlist item
   async function addWishlistItem(event) {
     event.preventDefault();
@@ -210,10 +183,15 @@
 
       if (data.success) {
         showToast('Item removed from wishlist');
-        document.querySelector(`[data-id="${wishlistId}"]`).remove();
-        if (document.querySelectorAll('.wishlist-card').length === 0) {
-          setTimeout(() => window.location.reload(), 500);
+        const card = document.querySelector(`[data-id="${wishlistId}"]`);
+        if (card) {
+          card.remove();
         }
+        if (document.querySelectorAll('[data-id]').length === 0) {
+          window.location.reload();
+          return;
+        }
+        setTimeout(() => window.location.reload(), 300);
       } else {
         showToast(data.error, true);
       }
@@ -344,5 +322,57 @@
   document.getElementById('adviceModal').addEventListener('click', (e) => {
     if (e.target.id === 'adviceModal') closeModal();
   });
+
+  const addMoreBtn = document.getElementById('wl2AddMoreBtn');
+  const cancelBtn = document.getElementById('wl2CancelBtn');
+  const formShell = document.getElementById('wl2FormShell');
+  const addMoreLabel = addMoreBtn ? addMoreBtn.querySelector('.wl2-add-more__label') : null;
+  const addMoreIcon = addMoreBtn ? addMoreBtn.querySelector('.wl2-add-more__icon') : null;
+
+  function setFormVisibility(show) {
+    if (!formShell) {
+      return;
+    }
+
+    formShell.classList.toggle('wl2-form-shell--hidden', !show);
+    formShell.setAttribute('aria-hidden', show ? 'false' : 'true');
+
+    if (addMoreBtn) {
+      addMoreBtn.classList.toggle('is-open', show);
+    }
+
+    if (addMoreLabel) {
+      addMoreLabel.textContent = show ? 'Hide add form' : '{% if wishlist_items %}Add another DREAM thing{% else %}Add your first DREAM thing{% endif %}';
+    }
+
+    if (addMoreIcon) {
+      addMoreIcon.textContent = show ? '−' : '＋';
+    }
+  }
+
+  if (addMoreBtn && formShell) {
+    addMoreBtn.addEventListener('click', () => {
+      const shouldShow = formShell.classList.contains('wl2-form-shell--hidden');
+      setFormVisibility(shouldShow);
+
+      if (shouldShow) {
+        formShell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const itemInput = document.getElementById('itemName');
+        if (itemInput) {
+          itemInput.focus();
+        }
+      }
+    });
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      const form = document.getElementById('addItemForm');
+      if (form) {
+        form.reset();
+      }
+      setFormVisibility(false);
+    });
+  }
 </script>
 {% endblock %}

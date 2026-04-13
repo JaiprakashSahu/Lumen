@@ -5,8 +5,8 @@ Provides intelligent purchase recommendations based on spending analytics
 
 import os
 from dotenv import load_dotenv
-from openai import OpenAI
 import json
+import requests
 
 load_dotenv()
 
@@ -24,10 +24,22 @@ def get_purchase_advice(item_name, expected_price, category, user_analytics):
         dict: AI advice with should_buy_now, reasons, risk, confidence, summary
     """
     try:
-        # Initialize OpenAI client
-        api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY")
-        base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        model = os.getenv("OPENAI_MODEL", "gpt-4")
+        # Resolve provider settings (OpenAI first, then Groq fallback).
+        openai_key = os.getenv("OPENAI_API_KEY")
+        groq_key = os.getenv("GROQ_API_KEY")
+
+        if openai_key:
+            api_key = openai_key
+            base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+            model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        elif groq_key:
+            api_key = groq_key
+            base_url = os.getenv("OPENAI_BASE_URL", "https://api.groq.com/openai/v1")
+            model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        else:
+            api_key = ""
+            base_url = ""
+            model = ""
         
         if not api_key:
             return {
@@ -37,8 +49,8 @@ def get_purchase_advice(item_name, expected_price, category, user_analytics):
                 "confidence": 0.0,
                 "summary": "Unable to provide advice without AI service."
             }
-        
-        client = OpenAI(api_key=api_key, base_url=base_url)
+
+        completion_url = base_url.rstrip("/") + "/chat/completions"
         
         # Build comprehensive prompt
         prompt = f"""You are a financial advisor. Based on user's last 90 days transactions and category spending trends, evaluate whether they should buy the wishlist item:
@@ -65,19 +77,37 @@ Provide:
 
 Return ONLY valid JSON with these exact fields. No markdown, no explanation."""
 
-        # Call AI
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
+        # Call AI via HTTP (OpenAI-compatible schema).
+        payload = {
+            "model": model,
+            "messages": [
                 {"role": "system", "content": "You are a financial advisor providing purchase recommendations in JSON format."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3,
-            max_tokens=500
+            "temperature": 0.3,
+            "max_tokens": 500
+        }
+
+        response = requests.post(
+            completion_url,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json=payload,
+            timeout=40
         )
-        
-        # Parse response
-        content = response.choices[0].message.content.strip()
+
+        if response.status_code != 200:
+            error_body = ""
+            try:
+                error_body = response.json()
+            except Exception:
+                error_body = response.text[:200]
+            raise RuntimeError(f"AI API error {response.status_code}: {error_body}")
+
+        response_json = response.json()
+        content = response_json["choices"][0]["message"]["content"].strip()
         
         # Clean JSON if wrapped in markdown
         if content.startswith("```json"):

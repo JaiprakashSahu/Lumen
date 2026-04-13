@@ -122,6 +122,10 @@ repo = TransactionRepository()
 # ---------------------- HOME ----------------------
 @app.route("/")
 def index():
+    # Keep authenticated users in MCP setup flow until they explicitly continue.
+    if "credentials" in session and session.get("mcp_setup_required"):
+        return redirect(url_for("mcp_setup"))
+
     # Show landing page for unauthenticated users
     if "credentials" in session or session.get("guest_access"):
         return redirect(url_for("dashboard_analytics"))
@@ -133,6 +137,9 @@ def index():
 @app.route("/login")
 def login_page():
     """Alternative login page route"""
+    if "credentials" in session and session.get("mcp_setup_required"):
+        return redirect(url_for("mcp_setup"))
+
     if "credentials" in session or session.get("guest_access"):
         return redirect(url_for("dashboard_analytics"))
     else:
@@ -147,8 +154,22 @@ def login_with_google():
 @app.route("/mcp/skip")
 def mcp_skip():
     """Allow user to skip MCP phone setup and continue to dashboard."""
-    session["guest_access"] = True
+    session.pop("mcp_setup_required", None)
+
+    # Keep guest mode only for users who skipped without Google auth.
+    if "credentials" not in session:
+        session["guest_access"] = True
+
     return redirect(url_for("dashboard_analytics"))
+
+
+@app.route("/mcp/setup")
+def mcp_setup():
+    """Post-login MCP options page shown immediately after Google auth."""
+    if "credentials" not in session:
+        return redirect(url_for("index"))
+
+    return render_template("landing.html", show_mcp_panel=True)
 
 
 # ---------------------- GOOGLE LOGIN ----------------------
@@ -215,6 +236,9 @@ def oauth2callback():
         "client_secret": creds.client_secret,
         "scopes": creds.scopes
     }
+
+    # Authenticated users should not remain in guest mode.
+    session.pop("guest_access", None)
     
     # Fetch user profile info from Google
     try:
@@ -242,7 +266,8 @@ def oauth2callback():
         session['user_name'] = 'LUMEN User'
         session['user_email'] = ''
 
-    return redirect(url_for("dashboard_analytics"))
+    session["mcp_setup_required"] = True
+    return redirect(url_for("mcp_setup"))
 
 
 # ---------------------- EXTRACT TRANSACTION INFO ----------------------
@@ -291,7 +316,7 @@ def extract_transaction(snippet):
 # ---------------------- RECEIPTS PAGE ----------------------
 @app.route("/receipts")
 def receipts_page():
-    if "credentials" not in session:
+    if "credentials" not in session and not session.get("guest_access"):
         return redirect(url_for("index"))
 
     # Load receipts from SQLite
@@ -323,7 +348,7 @@ def receipts_page():
 @app.route("/receipt/<receipt_id>")
 def view_receipt(receipt_id):
     """View detailed information for an OCR-uploaded receipt."""
-    if "credentials" not in session:
+    if "credentials" not in session and not session.get("guest_access"):
         return redirect(url_for("index"))
     
     # Get receipt from database
@@ -349,7 +374,7 @@ def view_receipt(receipt_id):
 # ---------------------- TRANSACTIONS PAGE ----------------------
 @app.route("/transactions")
 def transactions_page():
-    if "credentials" not in session:
+    if "credentials" not in session and not session.get("guest_access"):
         return redirect(url_for("index"))
 
     # Load transactions from SQLite
@@ -372,7 +397,7 @@ def transactions_page():
 @app.route("/transaction/<txn_id>")
 def transaction_detail(txn_id):
     """View detailed transaction information"""
-    if "credentials" not in session:
+    if "credentials" not in session and not session.get("guest_access"):
         return redirect(url_for("index"))
     
     # Get transaction from database
@@ -387,6 +412,10 @@ def transaction_detail(txn_id):
 # ---------------------- DOWNLOAD ATTACHMENT ----------------------
 @app.route("/download/<message_id>/<attachment_id>/<filename>")
 def download(message_id, attachment_id, filename):
+    if "credentials" not in session:
+        flash("Google login required to download Gmail attachments.", "error")
+        return redirect(url_for("receipts_page"))
+
     creds = Credentials(**session["credentials"])
     gmail = build("gmail", "v1", credentials=creds)
 

@@ -399,10 +399,10 @@
                 <div class="subtitle">Smart Finance Tracker</div>
             </div>
 
-            <div class="login-start" id="loginStart">
+            <div class="login-start{% if show_mcp_panel %} hidden{% endif %}" id="loginStart">
                 <div class="login-via-text">Login via google</div>
 
-                <button class="google-btn" id="loginBtn" type="button">
+                <a class="google-btn" href="{{ url_for('auth_google') }}">
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4" />
                         <path d="M9.003 18c2.43 0 4.467-.806 5.956-2.18L12.05 13.56c-.806.54-1.836.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.96v2.332C2.44 15.983 5.485 18 9.003 18z" fill="#34A853" />
@@ -410,10 +410,10 @@
                         <path d="M9.003 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.464.891 11.426 0 9.003 0 5.485 0 2.44 2.017.96 4.958L3.967 7.29c.708-2.127 2.692-3.71 5.036-3.71z" fill="#EA4335" />
                     </svg>
                     Google
-                </button>
+                </a>
             </div>
 
-            <div class="mcp-panel" id="mcpPanel">
+            <div class="mcp-panel{% if show_mcp_panel %} active{% endif %}" id="mcpPanel">
                 <p class="mcp-title">Add your Phone number to setup MCP server</p>
 
                 <div class="mcp-step active" id="phoneStep">
@@ -457,21 +457,11 @@
 {% block scripts %}
 <script>
     (function() {
-        const loginStart = document.getElementById('loginStart');
-        const loginBtn = document.getElementById('loginBtn');
-        const mcpPanel = document.getElementById('mcpPanel');
         const phoneStep = document.getElementById('phoneStep');
         const otpStep = document.getElementById('otpStep');
         const addPhoneBtn = document.getElementById('addPhoneBtn');
         const phoneInput = document.getElementById('phoneInput');
         const otpBoxes = Array.from(document.querySelectorAll('.otp-box'));
-
-        loginBtn.addEventListener('click', function() {
-            loginStart.classList.add('hidden');
-            mcpPanel.classList.add('active');
-            phoneStep.classList.add('active');
-            otpStep.classList.remove('active');
-        });
 
         addPhoneBtn.addEventListener('click', function() {
             phoneStep.classList.remove('active');

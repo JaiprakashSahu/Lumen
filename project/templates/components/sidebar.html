@@ -22,29 +22,21 @@
         </nav>
     </div>
 
-    <div class="nav-right" style="display: flex; gap: 12px; align-items: center;">
-        <a href="{{ url_for('sync_gmail') }}" class="action-btn sync-btn" id="syncBtn">
-            <span class="btn-icon">🔄</span>
-            <span>Sync</span>
-        </a>
-
+    <div class="nav-right">
         <!-- Profile Button -->
-        <div class="profile-wrapper" style="position: relative;">
-            <button onclick="toggleProfileDropdown()" class="action-btn profile-btn">
-                <span class="btn-icon">👤</span>
+        <div class="profile-wrapper">
+            <button onclick="toggleProfileDropdown()" class="action-btn profile-btn" id="profileMenuBtn" type="button" aria-expanded="false" aria-controls="profileDropdown">
                 <span>Profile</span>
             </button>
 
             <!-- Dropdown -->
-            <div id="profileDropdown" class="profile-dropdown"
-                style="display: none; position: absolute; top: 120%; right: 0; background: #fff; border-radius: 12px; min-width: 200px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 100; padding: 8px;">
-                <div style="padding: 12px; border-bottom: 1px solid #eee;">
-                    <div style="font-weight: 600; color: #333; font-size: 14px;">{{ session.get('user_name', 'User') }}
+            <div id="profileDropdown" class="profile-dropdown">
+                <div class="profile-meta">
+                    <div class="profile-name">{{ session.get('user_name', 'User') }}
                     </div>
-                    <div style="color: #666; font-size: 12px;">{{ session.get('user_email', '') }}</div>
+                    <div class="profile-email">{{ session.get('user_email', '') }}</div>
                 </div>
-                <a href="{{ url_for('logout') }}"
-                    style="display: block; padding: 10px 12px; color: #dc2626; text-decoration: none; font-size: 13px; font-weight: 500;">
+                <a href="{{ url_for('logout') }}" class="profile-logout-link">
                     Log Out
                 </a>
             </div>
@@ -55,13 +47,25 @@
 <script>
     function toggleProfileDropdown() {
         const d = document.getElementById('profileDropdown');
-        d.style.display = d.style.display === 'none' ? 'block' : 'none';
+        const btn = document.getElementById('profileMenuBtn');
+        if (!d || !btn) {
+            return;
+        }
+        const shouldOpen = d.style.display !== 'block';
+        d.style.display = shouldOpen ? 'block' : 'none';
+        btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
     }
 
     // Close on outside click
     document.addEventListener('click', function (e) {
+        const dropdown = document.getElementById('profileDropdown');
+        const btn = document.getElementById('profileMenuBtn');
+        if (!dropdown || !btn) {
+            return;
+        }
         if (!e.target.closest('.profile-wrapper')) {
-            document.getElementById('profileDropdown').style.display = 'none';
+            dropdown.style.display = 'none';
+            btn.setAttribute('aria-expanded', 'false');
         }
     });
 </script>

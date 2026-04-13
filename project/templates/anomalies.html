@@ -3,63 +3,6 @@
 
 {% block head %}
 <style>
-    .nav-wrapper {
-        padding: 20px 46px 0;
-        border-bottom: none;
-    }
-
-    .page-container {
-        padding: 10px 46px 34px;
-    }
-
-    .top-nav {
-        margin-bottom: 18px;
-    }
-
-    .nav-pills {
-        background: transparent;
-        border: none;
-        padding: 0;
-        gap: 14px;
-    }
-
-    .nav-item {
-        min-width: 172px;
-        text-align: center;
-        border: 1px solid rgba(255, 255, 255, 0.58);
-        color: rgba(255, 255, 255, 0.74);
-        font-size: 15px;
-        font-weight: 400;
-        padding: 10px 26px;
-        line-height: 1;
-    }
-
-    .nav-item.active {
-        color: #131313;
-        background: #ececec;
-        border-color: #ececec;
-        box-shadow: none;
-    }
-
-    #syncBtn {
-        display: none !important;
-    }
-
-    .profile-btn {
-        border: 1px solid rgba(255, 255, 255, 0.58) !important;
-        color: rgba(255, 255, 255, 0.74) !important;
-        background: transparent !important;
-        padding: 10px 30px;
-        font-size: 15px;
-        font-weight: 400;
-        line-height: 1;
-        box-shadow: none !important;
-    }
-
-    .profile-btn .btn-icon {
-        display: none;
-    }
-
     .dash-wrap {
         display: grid;
         gap: 22px;
@@ -306,16 +249,6 @@
         font-size: 14px;
     }
 
-    .refresh-inline {
-        border: 1px solid rgba(255, 255, 255, 0.45);
-        color: rgba(255, 255, 255, 0.78);
-        background: transparent;
-        border-radius: 999px;
-        padding: 8px 18px;
-        font-size: 14px;
-        cursor: pointer;
-    }
-
     @media (max-width: 1200px) {
         .page-container {
             padding: 10px 18px 30px;
@@ -345,8 +278,7 @@
         .pattern-list,
         .insight-summary,
         .insight-list,
-        .dataset-pill,
-        .refresh-inline {
+        .dataset-pill {
             font-size: clamp(14px, 2.4vw, 20px);
         }
 
@@ -362,10 +294,6 @@
 <div id="dashError" class="error-box" style="display:none;"></div>
 
 <section id="dashWrap" class="dash-wrap" style="display:none;">
-    <div style="display:flex; justify-content:flex-end;">
-        <button id="refreshBtn" class="refresh-inline" type="button">Refresh Data</button>
-    </div>
-
     <div class="top-row">
         <div class="metric-grid">
             <article class="metric-card">
@@ -470,7 +398,6 @@
             dashLoading: document.getElementById('dashLoading'),
             dashError: document.getElementById('dashError'),
             dashWrap: document.getElementById('dashWrap'),
-            refreshBtn: document.getElementById('refreshBtn'),
             debitTotal: document.getElementById('debitTotal'),
             creditTotal: document.getElementById('creditTotal'),
             netFlow: document.getElementById('netFlow'),
@@ -722,8 +649,6 @@
         }
 
         function bindEvents() {
-            el.refreshBtn.addEventListener('click', initDashboard);
-
             el.expMonthlyBtn.addEventListener('click', function () {
                 expMode = 'monthly';
                 expOffset = 0;
