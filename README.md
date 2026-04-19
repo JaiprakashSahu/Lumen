@@ -292,4 +292,4 @@ This project uses your consented financial data (receipts, bank statements) to a
 **Project LUMEN** - Smart Finance Tracker
 
 Made with ❤️ for better financial awareness
-Will be changing soon!!!
+Will be changing soon!!! Changes
