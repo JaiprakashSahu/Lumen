@@ -31,7 +31,8 @@ class TransactionRepository:
                 recurrence_interval=transaction_dict.get('recurrence_interval'),
                 confidence_score=transaction_dict.get('confidence_score', 0.0),
                 is_suspicious=transaction_dict.get('is_suspicious', False),
-                embedding_version=transaction_dict.get('embedding_version', 1)
+                embedding_version=transaction_dict.get('embedding_version', 1),
+                raw_email_snippet=transaction_dict.get('raw_email_snippet')
             )
             
             db.session.add(transaction)

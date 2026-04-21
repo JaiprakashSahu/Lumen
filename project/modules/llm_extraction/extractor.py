@@ -8,10 +8,85 @@ If local LLM is unavailable, automatically falls back to Groq.
 """
 
 import json
+import re
+from email.utils import parsedate_to_datetime
 from datetime import datetime
 
 # Use centralized LLM router
 from modules.llm.router import llm_router
+
+
+def _extract_header_value(text, header_name):
+    """Extract a header value from structured email text."""
+    if not text:
+        return ""
+    pattern = rf"^{re.escape(header_name)}\s*:\s*(.+)$"
+    match = re.search(pattern, text, flags=re.IGNORECASE | re.MULTILINE)
+    return match.group(1).strip() if match else ""
+
+
+def _fallback_merchant_from_text(text):
+    """Infer merchant/sender from From header when LLM extraction fails."""
+    sender = _extract_header_value(text, "From")
+    if not sender:
+        return "Unknown"
+
+    # Handle common forms: Name <email@domain.com>
+    sender = sender.split("<", 1)[0].strip().strip('"').strip("'")
+    return sender or "Unknown"
+
+
+def _fallback_date_from_text(text):
+    """Infer date from Date header, else fallback to today."""
+    date_header = _extract_header_value(text, "Date")
+    if date_header:
+        try:
+            return parsedate_to_datetime(date_header).strftime("%Y-%m-%d")
+        except Exception:
+            pass
+    return datetime.now().strftime('%Y-%m-%d')
+
+
+def _fallback_amount_from_text(text):
+    """Extract the first plausible currency amount from text."""
+    if not text:
+        return 0.0
+
+    patterns = [
+        r"(?:INR|Rs\.?|₹)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)",
+        r"([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(?:INR|Rs\.?|₹)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            try:
+                return float(match.group(1).replace(',', ''))
+            except (ValueError, TypeError):
+                continue
+
+    return 0.0
+
+
+def _fallback_total_amount_from_text(text):
+    """Extract total amount for receipts using total-specific patterns first."""
+    if not text:
+        return 0.0
+
+    total_patterns = [
+        r"total(?:\s+amount)?\s*[:\-]?\s*(?:INR|Rs\.?|₹)?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)",
+        r"amount\s+paid\s*[:\-]?\s*(?:INR|Rs\.?|₹)?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)",
+    ]
+
+    for pattern in total_patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            try:
+                return float(match.group(1).replace(',', ''))
+            except (ValueError, TypeError):
+                continue
+
+    return _fallback_amount_from_text(text)
 
 
 def call_llm_for_info(text):
@@ -201,15 +276,20 @@ def extract_transaction_from_text(text):
     # Fallback: Create basic transaction with raw text if LLM fails
     # This ensures ALL fetched data is stored
     print(f"⚠️ LLM extraction failed, using fallback for: {text[:100]}...")
+
+    fallback_merchant = _fallback_merchant_from_text(text)
+    fallback_amount = _fallback_amount_from_text(text)
+    fallback_date = _fallback_date_from_text(text)
+
     return {
         'txn_id': f"TXN_FALLBACK_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
         'description': text,
         'clean_description': text[:200],
-        'merchant_name': 'Unknown',
+        'merchant_name': fallback_merchant,
         'payment_channel': 'Unknown',
-        'amount': 0.0,
+        'amount': fallback_amount,
         'type': 'debit',
-        'date': datetime.now().strftime('%Y-%m-%d'),
+        'date': fallback_date,
         'weekday': datetime.now().strftime('%A'),
         'time_of_day': datetime.now().strftime('%H:%M'),
         'balance_after_txn': None,
@@ -363,17 +443,22 @@ def extract_receipt_from_text(text):
     # Fallback: Create basic receipt with raw text if LLM fails
     # This ensures ALL fetched data is stored
     print(f"⚠️ LLM extraction failed for receipt, using fallback: {text[:100]}...")
+
+    fallback_merchant = _fallback_merchant_from_text(text)
+    fallback_total = _fallback_total_amount_from_text(text)
+    fallback_date = _fallback_date_from_text(text)
+
     return {
         'receipt_id': f"RCP_FALLBACK_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
         'receipt_type': 'digital',
-        'issue_date': datetime.now().strftime('%Y-%m-%d'),
+        'issue_date': fallback_date,
         'issue_time': datetime.now().strftime('%H:%M'),
-        'merchant_name': 'Unknown',
+        'merchant_name': fallback_merchant,
         'merchant_address': '',
         'merchant_gst': '',
-        'subtotal_amount': 0.0,
+        'subtotal_amount': fallback_total,
         'tax_amount': 0.0,
-        'total_amount': 0.0,
+        'total_amount': fallback_total,
         'payment_method': 'Unknown',
         'extracted_confidence_score': 0.0,
         'is_suspicious': False,

@@ -1,7 +1,114 @@
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+import base64
+import re
 from modules.llm_extraction.extractor import extract_transaction_from_text, extract_receipt_from_text
 from modules.database.transaction_repo import TransactionRepository, ReceiptRepository
+
+
+def _decode_base64_url(data):
+    """Decode Gmail base64url payload into text."""
+    if not data:
+        return ""
+
+    try:
+        missing_padding = len(data) % 4
+        if missing_padding:
+            data += "=" * (4 - missing_padding)
+        return base64.urlsafe_b64decode(data.encode("utf-8")).decode("utf-8", errors="ignore")
+    except Exception:
+        return ""
+
+
+def _strip_html_tags(text):
+    """Convert basic HTML into readable plain text."""
+    if not text:
+        return ""
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</p\s*>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _collect_message_text(part, text_chunks):
+    """Recursively collect text/plain and text/html body chunks."""
+    if not part:
+        return
+
+    mime_type = (part.get("mimeType") or "").lower()
+    body_data = part.get("body", {}).get("data")
+
+    if mime_type.startswith("text/plain") and body_data:
+        decoded = _decode_base64_url(body_data)
+        if decoded.strip():
+            text_chunks.append(decoded.strip())
+    elif mime_type.startswith("text/html") and body_data:
+        decoded = _strip_html_tags(_decode_base64_url(body_data))
+        if decoded.strip():
+            text_chunks.append(decoded.strip())
+
+    for child in part.get("parts", []) or []:
+        _collect_message_text(child, text_chunks)
+
+
+def _header_map(full_msg):
+    """Build lowercase header map from Gmail message payload."""
+    headers = full_msg.get("payload", {}).get("headers", [])
+    return {
+        (h.get("name") or "").lower(): h.get("value") or ""
+        for h in headers
+    }
+
+
+def _build_llm_email_text(full_msg):
+    """Create rich per-message text input for LLM extraction."""
+    headers = _header_map(full_msg)
+    snippet = full_msg.get("snippet", "")
+
+    chunks = []
+    _collect_message_text(full_msg.get("payload", {}), chunks)
+
+    # Fallback: Gmail sometimes stores body directly at payload.body.data
+    if not chunks:
+        body_data = full_msg.get("payload", {}).get("body", {}).get("data")
+        decoded = _decode_base64_url(body_data)
+        if decoded.strip():
+            chunks.append(decoded.strip())
+
+    body_text = "\n".join(chunks)
+
+    combined_text = (
+        f"Subject: {headers.get('subject', '')}\n"
+        f"From: {headers.get('from', '')}\n"
+        f"To: {headers.get('to', '')}\n"
+        f"Date: {headers.get('date', '')}\n"
+        f"Snippet: {snippet}\n"
+        f"Body:\n{body_text}"
+    ).strip()
+
+    # Keep prompt size bounded while still giving enough context.
+    return combined_text[:12000]
+
+
+def _find_first_attachment(part):
+    """Recursively find the first attachment metadata in message parts."""
+    if not part:
+        return None
+
+    filename = part.get("filename")
+    attachment_id = part.get("body", {}).get("attachmentId")
+    if filename and attachment_id:
+        return {
+            "filename": filename,
+            "attachment_id": attachment_id,
+        }
+
+    for child in part.get("parts", []) or []:
+        found = _find_first_attachment(child)
+        if found:
+            return found
+
+    return None
 
 
 def sync_gmail_transactions(session_credentials):
@@ -26,13 +133,17 @@ def sync_gmail_transactions(session_credentials):
         for msg in messages:
             try:
                 full_msg = gmail.users().messages().get(userId="me", id=msg["id"], format="full").execute()
-                snippet = full_msg.get("snippet", "")
+                llm_input_text = _build_llm_email_text(full_msg)
                 
                 # Extract transaction info using LLM
-                transaction_dict = extract_transaction_from_text(snippet)
+                transaction_dict = extract_transaction_from_text(llm_input_text)
                 
                 # Store ALL transactions, even if extraction partially fails
                 if transaction_dict:
+                    # Keep one stable ID per Gmail message to avoid collisions/repeated IDs from model output.
+                    transaction_dict['txn_id'] = f"GMAIL_{msg['id']}"
+                    transaction_dict['raw_email_snippet'] = llm_input_text
+
                     # Check for duplicates
                     if not TransactionRepository.exists(transaction_dict['txn_id']):
                         # Also check by date/amount/merchant to avoid duplicates (if amount exists)
@@ -106,23 +217,24 @@ def sync_gmail_receipts(session_credentials):
                     continue
                 
                 full_msg = gmail.users().messages().get(userId="me", id=msg["id"], format="full").execute()
-                snippet = full_msg.get("snippet", "")
+                llm_input_text = _build_llm_email_text(full_msg)
                 
                 # Extract receipt info using LLM
-                receipt_dict = extract_receipt_from_text(snippet)
+                receipt_dict = extract_receipt_from_text(llm_input_text)
                 
                 if receipt_dict:
+                    # Keep one stable ID per Gmail message for deduplication and traceability.
+                    receipt_dict['receipt_id'] = f"RCP_GMAIL_{msg['id']}"
+
                     # Add attachment information
-                    parts = full_msg["payload"].get("parts", [])
-                    for part in parts:
-                        if part.get("filename") and part.get("body", {}).get("attachmentId"):
-                            receipt_dict['attachment_filename'] = part["filename"]
-                            receipt_dict['attachment_message_id'] = msg["id"]
-                            receipt_dict['attachment_id'] = part["body"]["attachmentId"]
-                            break  # Take first attachment
+                    attachment = _find_first_attachment(full_msg.get("payload", {}))
+                    if attachment:
+                        receipt_dict['attachment_filename'] = attachment["filename"]
+                        receipt_dict['attachment_message_id'] = msg["id"]
+                        receipt_dict['attachment_id'] = attachment["attachment_id"]
                     
                     # Store raw snippet
-                    receipt_dict['raw_snippet'] = snippet
+                    receipt_dict['raw_snippet'] = llm_input_text
                     
                     # Save to database
                     success, message = ReceiptRepository.add_receipt(receipt_dict)
