@@ -1,0 +1,30 @@
+# VCS
+.git
+.gitignore
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Local app data
+*.db
+*.sqlite
+*.sqlite3
+uploads/
+
+# Secrets and local env
+.env
+client_secret.json
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

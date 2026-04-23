@@ -69,6 +69,9 @@ db_path = os.path.join(project_dir, 'lumen_transactions.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Ensure runtime-writable directories exist on fresh deployments.
+os.makedirs(os.path.join(project_dir, 'uploads', 'receipts'), exist_ok=True)
+
 # Initialize ONE database instance
 db.init_app(app)
 
@@ -133,6 +136,8 @@ def internal_error(error):
     }), 500
 
 CLIENT_SECRET_FILE = os.getenv("GOOGLE_CLIENT_SECRET_FILE")
+if IS_PRODUCTION and not CLIENT_SECRET_FILE:
+    raise RuntimeError("GOOGLE_CLIENT_SECRET_FILE is required when APP_ENV=production")
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
@@ -978,6 +983,6 @@ def healthz():
 if __name__ == "__main__":
     app.run(
         host=os.getenv("FLASK_HOST", "0.0.0.0"),
-        port=int(os.getenv("PORT", "1024")),
+        port=int(os.getenv("PORT", "5000")),
         debug=os.getenv("FLASK_DEBUG", "0") == "1"
     )

@@ -192,6 +192,21 @@ GOOGLE_CLIENT_SECRET_FILE=client_secret.json
 PORT=5000
 ```
 
+Recommended additional production variables:
+
+```env
+TRUST_PROXY=1
+SESSION_COOKIE_SAMESITE=Lax
+SESSION_LIFETIME_HOURS=12
+WEB_CONCURRENCY=2
+GUNICORN_THREADS=4
+GUNICORN_TIMEOUT=120
+```
+
+Important:
+- `GOOGLE_CLIENT_SECRET_FILE` must point to a readable OAuth client JSON file in production.
+- The app validates this at startup when `APP_ENV=production`.
+
 ### 2. Install Production Dependencies
 
 ```bash
@@ -199,15 +214,31 @@ cd project
 pip install -r requirements.txt
 ```
 
+`requirements.txt` includes analytics dependencies required by startup imports.
+
 ### 3. Run with Gunicorn
 
 ```bash
 gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120 wsgi:app
 ```
 
-The project includes `project/wsgi.py` and a `project/Procfile` for platform deployment.
+The project includes `project/wsgi.py`, `project/Procfile`, and `project/runtime.txt` for platform deployment.
 
-### 4. Health Check Endpoint
+### 4. Deploy with Docker (Optional)
+
+```bash
+cd project
+docker build -t lumen-app .
+docker run --rm -p 5000:5000 \
+    --env-file .env \
+    -e APP_ENV=production \
+    -v "$(pwd)/client_secret.json:/app/client_secret.json:ro" \
+    lumen-app
+```
+
+The image uses Gunicorn and ships with a `.dockerignore` that excludes secrets and local DB artifacts.
+
+### 5. Health Check Endpoint
 
 Use this endpoint for load balancer/container health checks:
 
