@@ -337,6 +337,17 @@ body {
     display: none;
 }
 
+.top-nav .sync-icon-btn {
+    padding: 11px 14px;
+    min-width: 44px;
+    justify-content: center;
+}
+
+.top-nav .sync-icon-btn .btn-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
 .top-nav .action-btn:hover .btn-icon {
     transform: none;
 }

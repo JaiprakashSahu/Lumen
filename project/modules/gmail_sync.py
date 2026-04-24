@@ -4,6 +4,7 @@ import base64
 import re
 from modules.llm_extraction.extractor import extract_transaction_from_text, extract_receipt_from_text
 from modules.database.transaction_repo import TransactionRepository, ReceiptRepository
+from modules.analytics.cache import analytics_cache
 
 
 def _decode_base64_url(data):
@@ -268,9 +269,33 @@ def sync_gmail_receipts(session_credentials):
 def sync_all_gmail_data(session_credentials):
     """
     Sync both transactions and receipts from Gmail.
+    Always clears existing local records first to force a fresh rebuild.
     """
+    # Always start fresh: remove previously stored sync data.
+    tx_cleared_ok, tx_cleared = TransactionRepository.clear_all()
+    if not tx_cleared_ok:
+        return {
+            'transactions': {'success': False, 'error': tx_cleared},
+            'receipts': {'success': False, 'error': 'Sync aborted before receipt fetch'}
+        }
+
+    receipt_cleared_ok, receipt_cleared = ReceiptRepository.clear_all()
+    if not receipt_cleared_ok:
+        return {
+            'transactions': {
+                'success': False,
+                'error': f"Receipts clear failed after transactions clear ({tx_cleared} transactions removed): {receipt_cleared}"
+            },
+            'receipts': {'success': False, 'error': receipt_cleared}
+        }
+
+    analytics_cache.clear()
+
     tx_result = sync_gmail_transactions(session_credentials)
     receipt_result = sync_gmail_receipts(session_credentials)
+
+    tx_result['cleared_before_sync'] = tx_cleared
+    receipt_result['cleared_before_sync'] = receipt_cleared
     
     return {
         'transactions': tx_result,

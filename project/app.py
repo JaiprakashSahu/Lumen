@@ -448,9 +448,13 @@ def sync_gmail():
         tx_result = result.get('transactions', {})
         receipt_result = result.get('receipts', {})
         
-        message = f"Sync completed! "
-        message += f"Transactions: {tx_result.get('new_transactions', 0)} new, {tx_result.get('skipped', 0)} skipped. "
-        message += f"Receipts: {receipt_result.get('new_receipts', 0)} new, {receipt_result.get('skipped', 0)} skipped."
+        tx_cleared = tx_result.get('cleared_before_sync', 0)
+        receipt_cleared = receipt_result.get('cleared_before_sync', 0)
+
+        message = "Sync completed. "
+        message += f"Cleared {tx_cleared} transactions and {receipt_cleared} receipts before fetch. "
+        message += f"Transactions: {tx_result.get('new_transactions', 0)} new, {tx_result.get('skipped', 0)} skipped, {tx_result.get('errors', 0)} errors. "
+        message += f"Receipts: {receipt_result.get('new_receipts', 0)} new, {receipt_result.get('skipped', 0)} skipped, {receipt_result.get('errors', 0)} errors."
         
         flash(message, 'success')
     except Exception as e:

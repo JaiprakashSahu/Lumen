@@ -23,6 +23,12 @@
     </div>
 
     <div class="nav-right">
+        {% if session.get('credentials') %}
+        <a href="{{ url_for('sync_gmail') }}" class="action-btn profile-btn sync-icon-btn" title="Sync Gmail" aria-label="Sync Gmail">
+            <span class="btn-icon">&#x21bb;</span>
+        </a>
+        {% endif %}
+
         <!-- Profile Button -->
         <div class="profile-wrapper">
             <button onclick="toggleProfileDropdown()" class="action-btn profile-btn" id="profileMenuBtn" type="button" aria-expanded="false" aria-controls="profileDropdown">

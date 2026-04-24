@@ -79,6 +79,17 @@ class TransactionRepository:
         """Get the most recent transactions."""
         return Transaction.query.order_by(Transaction.created_at.desc()).limit(limit).all()
 
+    @staticmethod
+    def clear_all():
+        """Delete all transactions."""
+        try:
+            deleted = db.session.query(Transaction).delete()
+            db.session.commit()
+            return True, deleted
+        except Exception as e:
+            db.session.rollback()
+            return False, f"Error clearing transactions: {str(e)}"
+
 
 class ReceiptRepository:
     """Repository for managing receipts in the database."""
@@ -138,3 +149,14 @@ class ReceiptRepository:
     def get_recent(limit=40):
         """Get the most recent receipts."""
         return Receipt.query.order_by(Receipt.created_at.desc()).limit(limit).all()
+
+    @staticmethod
+    def clear_all():
+        """Delete all receipts."""
+        try:
+            deleted = db.session.query(Receipt).delete()
+            db.session.commit()
+            return True, deleted
+        except Exception as e:
+            db.session.rollback()
+            return False, f"Error clearing receipts: {str(e)}"

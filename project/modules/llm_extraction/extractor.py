@@ -68,6 +68,27 @@ def _fallback_amount_from_text(text):
     return 0.0
 
 
+def _fallback_transaction_amount_from_text(text):
+    """Extract transaction amount using debit/credit/payment context first."""
+    if not text:
+        return 0.0
+
+    contextual_patterns = [
+        r"(?:debited|credited|paid|payment(?:\s+of)?|sent|received|withdrawn|deposited|transferred)[^\n]{0,120}?(?:INR|Rs\.?|₹)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)",
+        r"(?:INR|Rs\.?|₹)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)[^\n]{0,120}?(?:debited|credited|paid|payment|sent|received|withdrawn|deposited|transferred)",
+    ]
+
+    for pattern in contextual_patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            try:
+                return float(match.group(1).replace(',', ''))
+            except (ValueError, TypeError):
+                continue
+
+    return _fallback_amount_from_text(text)
+
+
 def _fallback_total_amount_from_text(text):
     """Extract total amount for receipts using total-specific patterns first."""
     if not text:
@@ -87,6 +108,60 @@ def _fallback_total_amount_from_text(text):
                 continue
 
     return _fallback_amount_from_text(text)
+
+
+def _extract_candidate_amounts(text):
+    """Extract all plausible currency amounts present in source text."""
+    if not text:
+        return []
+
+    patterns = [
+        r"(?:INR|Rs\.?|₹)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)",
+        r"([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(?:INR|Rs\.?|₹)",
+    ]
+
+    values = []
+    for pattern in patterns:
+        for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+            try:
+                values.append(float(match.group(1).replace(',', '')))
+            except (ValueError, TypeError):
+                continue
+
+    # Keep order but remove duplicates by rounded value.
+    seen = set()
+    unique_values = []
+    for value in values:
+        key = round(value, 2)
+        if key not in seen:
+            seen.add(key)
+            unique_values.append(value)
+
+    return unique_values
+
+
+def _amount_matches_source(amount, text, tolerance=0.01):
+    """Check whether extracted amount is actually present in source text."""
+    if amount is None or amount <= 0:
+        return False
+
+    for source_amount in _extract_candidate_amounts(text):
+        if abs(source_amount - amount) <= tolerance:
+            return True
+
+    return False
+
+
+def _merchant_matches_source(merchant_name, text):
+    """Check whether merchant is grounded in source headers/body."""
+    if not merchant_name:
+        return False
+
+    merchant_norm = merchant_name.strip().lower()
+    if merchant_norm in ["", "unknown", "n/a", "na", "none", "null"]:
+        return False
+
+    return merchant_norm in (text or "").lower()
 
 
 def call_llm_for_info(text):
@@ -257,6 +332,9 @@ def extract_transaction_from_text(text):
     Falls back to basic extraction if LLM fails.
     """
     info_text = call_llm_for_info(text)
+    fallback_merchant = _fallback_merchant_from_text(text)
+    fallback_amount = _fallback_transaction_amount_from_text(text)
+    fallback_date = _fallback_date_from_text(text)
     
     if info_text:
         transaction_dict = parse_info_to_dict(info_text)
@@ -265,21 +343,32 @@ def extract_transaction_from_text(text):
         if transaction_dict:
             print(f"   📝 Parsed: {transaction_dict.get('merchant_name', 'Unknown')} | ₹{transaction_dict.get('amount', 0)} | {transaction_dict.get('category', 'Other')}")
         
-        # Accept if we got a valid merchant name (not just defaults)
-        if transaction_dict and transaction_dict.get('merchant_name', 'Unknown') != 'Unknown':
-            return transaction_dict
-        
-        # Also accept if we got a valid amount
-        if transaction_dict and transaction_dict.get('amount', 0) > 0:
-            return transaction_dict
+        if transaction_dict:
+            llm_merchant = transaction_dict.get('merchant_name', 'Unknown')
+            llm_amount = transaction_dict.get('amount', 0) or 0
+
+            merchant_grounded = _merchant_matches_source(llm_merchant, text)
+            amount_grounded = _amount_matches_source(llm_amount, text)
+
+            # If LLM output is not grounded in source text, override core fields
+            # with deterministic extraction from the same email.
+            if not merchant_grounded:
+                transaction_dict['merchant_name'] = fallback_merchant
+            if not amount_grounded:
+                transaction_dict['amount'] = fallback_amount
+
+            # If date looks missing/default-like, use email header date.
+            date_value = str(transaction_dict.get('date', '')).strip().lower()
+            if date_value in ['', 'unknown', 'none', 'null']:
+                transaction_dict['date'] = fallback_date
+
+            # Require at least one grounded core signal to trust output.
+            if transaction_dict.get('amount', 0) > 0 or transaction_dict.get('merchant_name', 'Unknown') != 'Unknown':
+                return transaction_dict
     
     # Fallback: Create basic transaction with raw text if LLM fails
     # This ensures ALL fetched data is stored
     print(f"⚠️ LLM extraction failed, using fallback for: {text[:100]}...")
-
-    fallback_merchant = _fallback_merchant_from_text(text)
-    fallback_amount = _fallback_amount_from_text(text)
-    fallback_date = _fallback_date_from_text(text)
 
     return {
         'txn_id': f"TXN_FALLBACK_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
@@ -434,19 +523,35 @@ def extract_receipt_from_text(text):
     Falls back to basic extraction if LLM fails.
     """
     info_text = call_llm_for_receipt_info(text)
+    fallback_merchant = _fallback_merchant_from_text(text)
+    fallback_total = _fallback_total_amount_from_text(text)
+    fallback_date = _fallback_date_from_text(text)
     
     if info_text:
         receipt_dict = parse_receipt_to_dict(info_text)
-        if receipt_dict and receipt_dict.get('total_amount', 0) > 0:
-            return receipt_dict
+        if receipt_dict:
+            llm_merchant = receipt_dict.get('merchant_name', 'Unknown')
+            llm_total = receipt_dict.get('total_amount', 0) or 0
+
+            merchant_grounded = _merchant_matches_source(llm_merchant, text)
+            total_grounded = _amount_matches_source(llm_total, text)
+
+            if not merchant_grounded:
+                receipt_dict['merchant_name'] = fallback_merchant
+            if not total_grounded:
+                receipt_dict['total_amount'] = fallback_total
+                receipt_dict['subtotal_amount'] = fallback_total
+
+            issue_date = str(receipt_dict.get('issue_date', '')).strip().lower()
+            if issue_date in ['', 'unknown', 'none', 'null']:
+                receipt_dict['issue_date'] = fallback_date
+
+            if receipt_dict.get('total_amount', 0) > 0 or receipt_dict.get('merchant_name', 'Unknown') != 'Unknown':
+                return receipt_dict
     
     # Fallback: Create basic receipt with raw text if LLM fails
     # This ensures ALL fetched data is stored
     print(f"⚠️ LLM extraction failed for receipt, using fallback: {text[:100]}...")
-
-    fallback_merchant = _fallback_merchant_from_text(text)
-    fallback_total = _fallback_total_amount_from_text(text)
-    fallback_date = _fallback_date_from_text(text)
 
     return {
         'receipt_id': f"RCP_FALLBACK_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
