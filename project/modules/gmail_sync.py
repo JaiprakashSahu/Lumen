@@ -2,6 +2,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import base64
 import re
+import hashlib
 from modules.llm_extraction.extractor import extract_transaction_from_text, extract_receipt_from_text
 from modules.database.transaction_repo import TransactionRepository, ReceiptRepository
 from modules.analytics.cache import analytics_cache
@@ -112,7 +113,14 @@ def _find_first_attachment(part):
     return None
 
 
-def sync_gmail_transactions(session_credentials):
+def _user_scope_prefix(user_email):
+    """Create stable per-user ID prefix for stored Gmail entities."""
+    normalized = (user_email or "").strip().lower()
+    digest = hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:10] if normalized else "anon"
+    return f"U{digest}_"
+
+
+def sync_gmail_transactions(session_credentials, user_email):
     """
     Fetch transaction emails from Gmail, extract with LLM, and store in SQLite.
     Only processes new transactions that aren't already in the database.
@@ -141,8 +149,9 @@ def sync_gmail_transactions(session_credentials):
                 
                 # Store ALL transactions, even if extraction partially fails
                 if transaction_dict:
-                    # Keep one stable ID per Gmail message to avoid collisions/repeated IDs from model output.
-                    transaction_dict['txn_id'] = f"GMAIL_{msg['id']}"
+                    # Keep one stable ID per Gmail message and user.
+                    txn_id = f"{_user_scope_prefix(user_email)}GMAIL_{msg['id']}"
+                    transaction_dict['txn_id'] = txn_id
                     transaction_dict['raw_email_snippet'] = llm_input_text
 
                     # Check for duplicates
@@ -153,7 +162,8 @@ def sync_gmail_transactions(session_credentials):
                             duplicate_check = TransactionRepository.check_duplicate(
                                 transaction_dict['date'],
                                 transaction_dict['amount'],
-                                transaction_dict['merchant_name']
+                                transaction_dict['merchant_name'],
+                                user_email=user_email
                             )
                         else:
                             duplicate_check = False
@@ -191,7 +201,7 @@ def sync_gmail_transactions(session_credentials):
         }
 
 
-def sync_gmail_receipts(session_credentials):
+def sync_gmail_receipts(session_credentials, user_email):
     """
     Fetch receipt/invoice emails from Gmail, extract with LLM, and store in SQLite.
     Only processes new receipts that aren't already in the database.
@@ -212,8 +222,10 @@ def sync_gmail_receipts(session_credentials):
         
         for msg in messages:
             try:
-                # Check if this message was already processed
-                if ReceiptRepository.check_duplicate_by_message(msg["id"]):
+                receipt_id = f"{_user_scope_prefix(user_email)}GMAIL_{msg['id']}"
+
+                # Check if this message was already processed for this user.
+                if ReceiptRepository.exists(receipt_id):
                     skipped_count += 1
                     continue
                 
@@ -224,8 +236,8 @@ def sync_gmail_receipts(session_credentials):
                 receipt_dict = extract_receipt_from_text(llm_input_text)
                 
                 if receipt_dict:
-                    # Keep one stable ID per Gmail message for deduplication and traceability.
-                    receipt_dict['receipt_id'] = f"RCP_GMAIL_{msg['id']}"
+                    # Keep one stable ID per Gmail message and user.
+                    receipt_dict['receipt_id'] = receipt_id
 
                     # Add attachment information
                     attachment = _find_first_attachment(full_msg.get("payload", {}))
@@ -266,36 +278,16 @@ def sync_gmail_receipts(session_credentials):
         }
 
 
-def sync_all_gmail_data(session_credentials):
+def sync_all_gmail_data(session_credentials, user_email):
     """
     Sync both transactions and receipts from Gmail.
-    Always clears existing local records first to force a fresh rebuild.
+    Additive sync: keeps previous records and inserts only new Gmail messages.
     """
-    # Always start fresh: remove previously stored sync data.
-    tx_cleared_ok, tx_cleared = TransactionRepository.clear_all()
-    if not tx_cleared_ok:
-        return {
-            'transactions': {'success': False, 'error': tx_cleared},
-            'receipts': {'success': False, 'error': 'Sync aborted before receipt fetch'}
-        }
+    tx_result = sync_gmail_transactions(session_credentials, user_email)
+    receipt_result = sync_gmail_receipts(session_credentials, user_email)
 
-    receipt_cleared_ok, receipt_cleared = ReceiptRepository.clear_all()
-    if not receipt_cleared_ok:
-        return {
-            'transactions': {
-                'success': False,
-                'error': f"Receipts clear failed after transactions clear ({tx_cleared} transactions removed): {receipt_cleared}"
-            },
-            'receipts': {'success': False, 'error': receipt_cleared}
-        }
-
+    # Analytics cache should refresh after new data is inserted.
     analytics_cache.clear()
-
-    tx_result = sync_gmail_transactions(session_credentials)
-    receipt_result = sync_gmail_receipts(session_credentials)
-
-    tx_result['cleared_before_sync'] = tx_cleared
-    receipt_result['cleared_before_sync'] = receipt_cleared
     
     return {
         'transactions': tx_result,

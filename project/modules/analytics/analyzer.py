@@ -7,6 +7,7 @@ import io
 import base64
 import time
 import json
+import hashlib
 import requests
 import pandas as pd
 import matplotlib
@@ -28,7 +29,14 @@ plt.rcParams['figure.figsize'] = (10, 6)
 plt.rcParams['font.size'] = 10
 
 
-def load_transactions_from_db(app):
+def _user_scope_prefix(user_email):
+    """Stable per-user prefix used in transaction IDs."""
+    normalized = (user_email or "").strip().lower()
+    digest = hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:10] if normalized else "anon"
+    return f"U{digest}_"
+
+
+def load_transactions_from_db(app, user_email=None):
     """
     Load all transactions from SQLite database into pandas DataFrame.
     
@@ -44,7 +52,11 @@ def load_transactions_from_db(app):
     from modules.database.models import Transaction
     
     with app.app_context():
-        transactions = Transaction.query.all()
+        query = Transaction.query
+        if user_email:
+            query = query.filter(Transaction.txn_id.like(f"{_user_scope_prefix(user_email)}%"))
+
+        transactions = query.all()
         
         if not transactions:
             print(">> No transactions found in database")
@@ -588,7 +600,7 @@ def _fallback_insights(df, money_flow):
     }
 
 
-def generate_analytics_report(app, month=None, year=None):
+def generate_analytics_report(app, month=None, year=None, user_email=None):
     """
     Generate complete analytics report with charts and insights.
     
@@ -606,7 +618,7 @@ def generate_analytics_report(app, month=None, year=None):
     print("="*80)
     
     # Load data
-    df = load_transactions_from_db(app)
+    df = load_transactions_from_db(app, user_email=user_email)
     
     if df.empty:
         print(">> No transactions to analyze")

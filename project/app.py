@@ -327,7 +327,8 @@ def oauth2callback():
 @require_auth(allow_guest=True)
 def receipts_page():
     # Load receipts from SQLite
-    receipts_data = ReceiptRepository.get_recent(limit=40)
+    user_email = get_or_cache_user_email() if "credentials" in session else None
+    receipts_data = ReceiptRepository.get_recent(limit=40, user_email=user_email) if user_email else []
 
     receipts = []
     for receipt in receipts_data:
@@ -357,7 +358,8 @@ def receipts_page():
 def view_receipt(receipt_id):
     """View detailed information for an OCR-uploaded receipt."""
     # Get receipt from database
-    receipt = Receipt.query.filter_by(receipt_id=receipt_id).first()
+    user_email = get_or_cache_user_email() if "credentials" in session else None
+    receipt = ReceiptRepository.get_by_id(receipt_id, user_email=user_email) if user_email else None
     
     if not receipt:
         return "Receipt not found", 404
@@ -381,7 +383,8 @@ def view_receipt(receipt_id):
 @require_auth(allow_guest=True)
 def transactions_page():
     # Load transactions from SQLite
-    transactions = repo.get_all()[:40]  # Get first 40
+    user_email = get_or_cache_user_email() if "credentials" in session else None
+    transactions = repo.get_all(user_email=user_email)[:40] if user_email else []  # Get first 40
 
     tx_list = []
     for tx in transactions:
@@ -402,7 +405,8 @@ def transactions_page():
 def transaction_detail(txn_id):
     """View detailed transaction information"""
     # Get transaction from database
-    transaction = Transaction.query.filter_by(txn_id=txn_id).first()
+    user_email = get_or_cache_user_email() if "credentials" in session else None
+    transaction = repo.get_by_id(txn_id, user_email=user_email) if user_email else None
     
     if not transaction:
         return "Transaction not found", 404
@@ -441,18 +445,19 @@ def download(message_id, attachment_id, filename):
 @require_auth()
 def sync_gmail():
     try:
+        user_email = get_or_cache_user_email()
+        if not user_email:
+            flash("Could not resolve user email from Google session. Please login again.", "error")
+            return redirect(url_for("auth_google"))
+
         # Run Gmail sync with LLM extraction
-        result = sync_all_gmail_data(session["credentials"])
+        result = sync_all_gmail_data(session["credentials"], user_email)
         
         # Format success message
         tx_result = result.get('transactions', {})
         receipt_result = result.get('receipts', {})
-        
-        tx_cleared = tx_result.get('cleared_before_sync', 0)
-        receipt_cleared = receipt_result.get('cleared_before_sync', 0)
 
         message = "Sync completed. "
-        message += f"Cleared {tx_cleared} transactions and {receipt_cleared} receipts before fetch. "
         message += f"Transactions: {tx_result.get('new_transactions', 0)} new, {tx_result.get('skipped', 0)} skipped, {tx_result.get('errors', 0)} errors. "
         message += f"Receipts: {receipt_result.get('new_receipts', 0)} new, {receipt_result.get('skipped', 0)} skipped, {receipt_result.get('errors', 0)} errors."
         
@@ -468,7 +473,11 @@ def sync_gmail():
 def sync_gmail_api():
     """API endpoint for AJAX sync requests"""
     try:
-        result = sync_all_gmail_data(session["credentials"])
+        user_email = get_or_cache_user_email()
+        if not user_email:
+            return jsonify({"success": False, "error": "Could not resolve user email from Google session"}), 401
+
+        result = sync_all_gmail_data(session["credentials"], user_email)
         return jsonify({"success": True, "data": result})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -478,7 +487,8 @@ def sync_gmail_api():
 @app.route("/api/debug/transactions")
 def debug_transactions():
     """View all transactions in database (JSON)"""
-    transactions = repo.get_all()
+    user_email = get_or_cache_user_email() if "credentials" in session else None
+    transactions = repo.get_all(user_email=user_email) if user_email else []
     return jsonify({
         "count": len(transactions),
         "transactions": [t.to_dict() for t in transactions]
@@ -488,7 +498,8 @@ def debug_transactions():
 @app.route("/api/debug/receipts")
 def debug_receipts():
     """View all receipts in database (JSON)"""
-    receipts = ReceiptRepository.get_all() if hasattr(ReceiptRepository, 'get_all') else []
+    user_email = get_or_cache_user_email() if "credentials" in session else None
+    receipts = ReceiptRepository.get_all(user_email=user_email) if user_email and hasattr(ReceiptRepository, 'get_all') else []
     return jsonify({
         "count": len(receipts),
         "receipts": [r.to_dict() for r in receipts]
@@ -498,8 +509,9 @@ def debug_receipts():
 @app.route("/api/debug/stats")
 def debug_stats():
     """View database statistics"""
-    transactions = repo.get_all()
-    receipts = ReceiptRepository.get_all() if hasattr(ReceiptRepository, 'get_all') else []
+    user_email = get_or_cache_user_email() if "credentials" in session else None
+    transactions = repo.get_all(user_email=user_email) if user_email else []
+    receipts = ReceiptRepository.get_all(user_email=user_email) if user_email and hasattr(ReceiptRepository, 'get_all') else []
     
     credit_txns = [t for t in transactions if t.type == 'credit']
     debit_txns = [t for t in transactions if t.type == 'debit']
@@ -600,7 +612,8 @@ def save_transaction():
 def get_all_transactions():
     """Get all transactions from the database"""
     try:
-        transactions = repo.get_all()
+        user_email = get_or_cache_user_email() if "credentials" in session else None
+        transactions = repo.get_all(user_email=user_email) if user_email else []
         return jsonify({
             "success": True,
             "count": len(transactions),
@@ -629,7 +642,9 @@ def dashboard_data():
     """
     try:
         print("📊 Dashboard data requested")
-        return jsonify(build_dashboard_payload(repo.get_all()))
+        user_email = get_or_cache_user_email() if "credentials" in session else None
+        transactions = repo.get_all(user_email=user_email) if user_email else []
+        return jsonify(build_dashboard_payload(transactions))
         
     except Exception as e:
         print(f"❌ Dashboard data error: {str(e)}")
@@ -651,8 +666,11 @@ def anomalies_data():
         month = request.args.get('month')
         year = request.args.get('year')
         
+        user_email = get_or_cache_user_email() if "credentials" in session else None
+        cache_scope = (user_email or "guest").replace("@", "_at_")
+
         # Use a parameterized cache key
-        cache_key = f"analytics_report_{month or 'latest'}_{year or 'latest'}"
+        cache_key = f"analytics_report_{cache_scope}_{month or 'latest'}_{year or 'latest'}"
         
         # Check cache first
         cached_data = analytics_cache.get(cache_key)
@@ -665,7 +683,7 @@ def anomalies_data():
             })
         
         # Generate fresh analytics report
-        report = generate_analytics_report(app, month=month, year=year)
+        report = generate_analytics_report(app, month=month, year=year, user_email=user_email)
         
         # Cache the result (for example, for 1 hour)
         analytics_cache.set(cache_key, report)
@@ -803,7 +821,8 @@ def get_wishlist_advice(wishlist_id):
             return jsonify({"success": False, "error": "Item not found"}), 404
         
         # Get user's transactions for analytics
-        transactions = repo.get_all()
+        user_email = get_or_cache_user_email()
+        transactions = repo.get_all(user_email=user_email) if user_email else []
         
         # Import AI advisor
         from modules.wishlist.ai_advisor import get_purchase_advice, build_analytics_summary

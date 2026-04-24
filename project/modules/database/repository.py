@@ -1,6 +1,7 @@
 """
 Transaction Repository - Isolates all database operations.
 """
+import hashlib
 from modules.database.db import db
 from modules.database.models import Transaction
 
@@ -8,6 +9,12 @@ from modules.database.models import Transaction
 class TransactionRepository:
     """Repository class for Transaction CRUD operations"""
     
+    @staticmethod
+    def _user_scope_prefix(user_email: str | None) -> str:
+        normalized = (user_email or "").strip().lower()
+        digest = hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:10] if normalized else "anon"
+        return f"U{digest}_"
+
     def add(self, data: dict):
         """
         Add a transaction to the database.
@@ -40,16 +47,19 @@ class TransactionRepository:
         """
         return db.session.query(Transaction).filter_by(txn_id=txn_id).first() is not None
 
-    def get_all(self):
+    def get_all(self, user_email: str | None = None):
         """
         Get all transactions from the database.
         
         Returns:
             list: List of Transaction objects
         """
-        return Transaction.query.all()
+        query = Transaction.query
+        if user_email:
+            query = query.filter(Transaction.txn_id.like(f"{self._user_scope_prefix(user_email)}%"))
+        return query.all()
     
-    def get_by_id(self, txn_id):
+    def get_by_id(self, txn_id, user_email: str | None = None):
         """
         Get a transaction by its ID.
         
@@ -59,7 +69,10 @@ class TransactionRepository:
         Returns:
             Transaction or None
         """
-        return Transaction.query.filter_by(txn_id=txn_id).first()
+        query = Transaction.query.filter_by(txn_id=txn_id)
+        if user_email:
+            query = query.filter(Transaction.txn_id.like(f"{self._user_scope_prefix(user_email)}%"))
+        return query.first()
 
     def delete_all(self):
         """

@@ -1,5 +1,13 @@
 from .models import db, Transaction, Receipt
 from datetime import datetime
+import hashlib
+
+
+def _user_scope_prefix(user_email):
+    """Stable per-user prefix used in transaction/receipt IDs."""
+    normalized = (user_email or "").strip().lower()
+    digest = hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:10] if normalized else "anon"
+    return f"U{digest}_"
 
 
 class TransactionRepository:
@@ -48,13 +56,18 @@ class TransactionRepository:
         return Transaction.query.filter_by(txn_id=txn_id).first() is not None
     
     @staticmethod
-    def check_duplicate(date, amount, merchant):
-        """Check for duplicate based on date, amount, and merchant."""
-        return Transaction.query.filter_by(
+    def check_duplicate(date, amount, merchant, user_email=None):
+        """Check for duplicate based on date, amount, merchant, scoped to user when provided."""
+        query = Transaction.query.filter_by(
             date=date,
             amount=amount,
             merchant_name=merchant
-        ).first() is not None
+        )
+
+        if user_email:
+            query = query.filter(Transaction.txn_id.like(f"{_user_scope_prefix(user_email)}%"))
+
+        return query.first() is not None
     
     @staticmethod
     def get_all():
@@ -134,6 +147,14 @@ class ReceiptRepository:
     def exists(receipt_id):
         """Check if a receipt exists by receipt_id."""
         return Receipt.query.filter_by(receipt_id=receipt_id).first() is not None
+
+    @staticmethod
+    def get_by_id(receipt_id, user_email=None):
+        """Get a receipt by ID, optionally scoped to a user prefix."""
+        query = Receipt.query.filter_by(receipt_id=receipt_id)
+        if user_email:
+            query = query.filter(Receipt.receipt_id.like(f"{_user_scope_prefix(user_email)}%"))
+        return query.first()
     
     @staticmethod
     def check_duplicate_by_message(message_id):
@@ -141,14 +162,20 @@ class ReceiptRepository:
         return Receipt.query.filter_by(attachment_message_id=message_id).first() is not None
     
     @staticmethod
-    def get_all():
-        """Get all receipts."""
-        return Receipt.query.order_by(Receipt.created_at.desc()).all()
-    
+    def get_all(user_email=None):
+        """Get all receipts, optionally scoped to a user prefix."""
+        query = Receipt.query
+        if user_email:
+            query = query.filter(Receipt.receipt_id.like(f"{_user_scope_prefix(user_email)}%"))
+        return query.order_by(Receipt.created_at.desc()).all()
+
     @staticmethod
-    def get_recent(limit=40):
-        """Get the most recent receipts."""
-        return Receipt.query.order_by(Receipt.created_at.desc()).limit(limit).all()
+    def get_recent(limit=40, user_email=None):
+        """Get recent receipts, optionally scoped to a user prefix."""
+        query = Receipt.query
+        if user_email:
+            query = query.filter(Receipt.receipt_id.like(f"{_user_scope_prefix(user_email)}%"))
+        return query.order_by(Receipt.created_at.desc()).limit(limit).all()
 
     @staticmethod
     def clear_all():
